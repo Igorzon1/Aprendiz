@@ -1,0 +1,49 @@
+{
+ "Divonica": {
+  "clips": [
+   "Idle",
+   "Blink",
+   "Walk",
+   "Run",
+   "Wave",
+   "Talk",
+   "Excited",
+   "GiveWand",
+   "Point"
+  ],
+  "frames": {
+   "Idle": 80,
+   "Blink": 12,
+   "Walk": 28,
+   "Run": 18,
+   "Wave": 40,
+   "Talk": 48,
+   "Excited": 40,
+   "GiveWand": 60,
+   "Point": 30
+  },
+  "cyclic": [
+   "Idle",
+   "Walk",
+   "Run",
+   "Talk"
+  ],
+  "events": {
+   "Wave": {
+    "hello": 14
+   },
+   "Excited": {
+    "hop1": 10,
+    "hop2": 23
+   },
+   "GiveWand": {
+    "offer": 32,
+    "release": 44
+   },
+   "Point": {
+    "point": 9
+   }
+  },
+  "fps": 30
+ }
+}

@@ -1,0 +1,488 @@
+{
+ "ApprenticeSolo": {
+  "clips": [
+   "Idle",
+   "Blink",
+   "Walk",
+   "Run",
+   "Cast_Lumos",
+   "Cast_Levitate",
+   "Pet_Cats",
+   "Cast_Fizzle",
+   "Idle_AFK",
+   "WakeUp",
+   "Attack_Basic",
+   "Interact",
+   "Surprised",
+   "Hit",
+   "Defeat",
+   "Idle_AFK_Toy",
+   "ReceiveWand",
+   "Cheer",
+   "Cast_YarnBall",
+   "Cast_CatPounce",
+   "Cast_PurrHeal",
+   "Cast_GiantPetico"
+  ],
+  "frames": {
+   "Idle": 96,
+   "Blink": 12,
+   "Walk": 32,
+   "Run": 20,
+   "Cast_Lumos": 60,
+   "Cast_Levitate": 84,
+   "Pet_Cats": 84,
+   "Cast_Fizzle": 54,
+   "Idle_AFK": 210,
+   "WakeUp": 60,
+   "Attack_Basic": 24,
+   "Interact": 30,
+   "Surprised": 40,
+   "Hit": 16,
+   "Defeat": 48,
+   "Idle_AFK_Toy": 210,
+   "ReceiveWand": 60,
+   "Cheer": 36,
+   "Cast_YarnBall": 72,
+   "Cast_CatPounce": 66,
+   "Cast_PurrHeal": 72,
+   "Cast_GiantPetico": 96
+  },
+  "cyclic": [
+   "Idle",
+   "Walk",
+   "Run"
+  ],
+  "events": {
+   "Cast_YarnBall": {
+    "spawn_yarn": 14,
+    "first_bounce": 22
+   },
+   "Cast_CatPounce": {
+    "leap": 19,
+    "hit": 31,
+    "cats_back": 58
+   },
+   "Cast_PurrHeal": {
+    "heal_ticks": [
+     18,
+     30,
+     42,
+     54
+    ]
+   },
+   "Cast_GiantPetico": {
+    "zap": 26,
+    "giant": 40,
+    "meow_aoe": 62,
+    "shrink": 74
+   },
+   "WakeUp": {
+    "eyes_open": 38
+   },
+   "Attack_Basic": {
+    "release": 9
+   },
+   "Interact": {
+    "grab": 12
+   },
+   "Surprised": {
+    "hop": 4
+   },
+   "Defeat": {
+    "plop": 29
+   },
+   "Idle_AFK": {
+    "sparkle_on": 40,
+    "sparkle_off": 142
+   },
+   "Idle_AFK_Toy": {
+    "toy_out": 52,
+    "toy_away": 192
+   },
+   "ReceiveWand": {
+    "take": 20,
+    "sparkle": 40
+   },
+   "Cheer": {
+    "hop": 5
+   }
+  },
+  "fps": 30
+ },
+ "Yumi": {
+  "clips": [
+   "Idle",
+   "Blink",
+   "Walk",
+   "Run",
+   "SitDown",
+   "Sit_Idle",
+   "StandUp",
+   "Groom",
+   "Stretch",
+   "Pounce",
+   "Meow",
+   "Purr",
+   "Startled"
+  ],
+  "frames": {
+   "Idle": 84,
+   "Blink": 12,
+   "Walk": 20,
+   "Run": 14,
+   "SitDown": 18,
+   "Sit_Idle": 60,
+   "StandUp": 14,
+   "Groom": 72,
+   "Stretch": 48,
+   "Pounce": 32,
+   "Meow": 30,
+   "Purr": 48,
+   "Startled": 24
+  },
+  "cyclic": [
+   "Idle",
+   "Walk",
+   "Run",
+   "Sit_Idle",
+   "Purr"
+  ],
+  "events": {
+   "Pounce": {
+    "leap": 15,
+    "land": 24
+   },
+   "Meow": {
+    "meow": 8
+   },
+   "Startled": {
+    "jump": 3
+   },
+   "SitDown": {
+    "seated": 15
+   }
+  },
+  "fps": 30
+ },
+ "Petico": {
+  "clips": [
+   "Idle",
+   "Blink",
+   "Walk",
+   "Run",
+   "SitDown",
+   "Sit_Idle",
+   "StandUp",
+   "Groom",
+   "Stretch",
+   "Pounce",
+   "Meow",
+   "Purr",
+   "Startled"
+  ],
+  "frames": {
+   "Idle": 96,
+   "Blink": 12,
+   "Walk": 20,
+   "Run": 14,
+   "SitDown": 18,
+   "Sit_Idle": 72,
+   "StandUp": 14,
+   "Groom": 72,
+   "Stretch": 48,
+   "Pounce": 32,
+   "Meow": 30,
+   "Purr": 48,
+   "Startled": 24
+  },
+  "cyclic": [
+   "Idle",
+   "Walk",
+   "Run",
+   "Sit_Idle",
+   "Purr"
+  ],
+  "events": {
+   "Pounce": {
+    "leap": 15,
+    "land": 24
+   },
+   "Meow": {
+    "meow": 8
+   },
+   "Startled": {
+    "jump": 3
+   },
+   "SitDown": {
+    "seated": 15
+   }
+  },
+  "fps": 30
+ },
+ "Arcanist": {
+  "clips": [
+   "Idle",
+   "Blink",
+   "Walk",
+   "Run",
+   "Cast_Fireball",
+   "Idle_AFK",
+   "Cast_EmberVolley",
+   "Cast_FlameStream_Start",
+   "Cast_FlameStream_Loop",
+   "Cast_FlameStream_End",
+   "Cast_GiantFireball"
+  ],
+  "frames": {
+   "Idle": 72,
+   "Blink": 12,
+   "Walk": 32,
+   "Run": 18,
+   "Cast_Fireball": 48,
+   "Idle_AFK": 180,
+   "Cast_EmberVolley": 54,
+   "Cast_FlameStream_Start": 20,
+   "Cast_FlameStream_Loop": 24,
+   "Cast_FlameStream_End": 20,
+   "Cast_GiantFireball": 84
+  },
+  "cyclic": [
+   "Idle",
+   "Walk",
+   "Run",
+   "Cast_FlameStream_Loop"
+  ],
+  "events": {
+   "Cast_Fireball": {
+    "release": 17
+   },
+   "Cast_EmberVolley": {
+    "shots": [
+     22,
+     25,
+     28,
+     31,
+     34
+    ]
+   },
+   "Cast_FlameStream_Start": {
+    "stream_on": 6
+   },
+   "Cast_FlameStream_Loop": {
+    "damage_tick_every": 6
+   },
+   "Cast_FlameStream_End": {
+    "stream_off": 0
+   },
+   "Cast_GiantFireball": {
+    "charge_start": 10,
+    "release": 54,
+    "impact": 72
+   }
+  },
+  "fps": 30
+ },
+ "ShadowDruid": {
+  "clips": [
+   "Idle",
+   "Blink",
+   "Walk",
+   "Run",
+   "Cast_DarkMagic",
+   "Idle_AFK",
+   "Cast_BlackLightning",
+   "Cast_ShadowRoots",
+   "Cast_Summon"
+  ],
+  "frames": {
+   "Idle": 80,
+   "Blink": 12,
+   "Walk": 32,
+   "Run": 18,
+   "Cast_DarkMagic": 60,
+   "Idle_AFK": 180,
+   "Cast_BlackLightning": 60,
+   "Cast_ShadowRoots": 66,
+   "Cast_Summon": 72
+  },
+  "cyclic": [
+   "Idle",
+   "Walk",
+   "Run"
+  ],
+  "events": {
+   "Cast_DarkMagic": {
+    "release": 36
+   },
+   "Cast_BlackLightning": {
+    "fire_start": 18,
+    "fire_end": 40,
+    "damage_tick_every": 4
+   },
+   "Cast_ShadowRoots": {
+    "impact": 14,
+    "roots_up": 18,
+    "roots_down": 48
+   },
+   "Cast_Summon": {
+    "sigil": 8,
+    "spawn_minion": 24,
+    "minion_offset_m": [
+     0.0,
+     -0.58,
+     0.0
+    ]
+   }
+  },
+  "fps": 30
+ },
+ "SpectralWitch": {
+  "clips": [
+   "Idle",
+   "Blink",
+   "Walk",
+   "Run",
+   "Cast_Spirits",
+   "Idle_AFK",
+   "Cast_Boo",
+   "Cast_SoulWard",
+   "Cast_GhostSlam"
+  ],
+  "frames": {
+   "Idle": 72,
+   "Blink": 12,
+   "Walk": 32,
+   "Run": 18,
+   "Cast_Spirits": 72,
+   "Idle_AFK": 180,
+   "Cast_Boo": 60,
+   "Cast_SoulWard": 72,
+   "Cast_GhostSlam": 96
+  },
+  "cyclic": [
+   "Idle",
+   "Walk",
+   "Run"
+  ],
+  "events": {
+   "Cast_Spirits": {
+    "release": 24
+   },
+   "Cast_Boo": {
+    "boo": 26,
+    "fear_radius_m": 1.0
+   },
+   "Cast_SoulWard": {
+    "shield_on": 18,
+    "shield_off": 60
+   },
+   "Cast_GhostSlam": {
+    "slam": 52,
+    "aoe_radius_m": 0.9
+   }
+  },
+  "fps": 30
+ },
+ "ShadowMinion": {
+  "clips": [
+   "Idle",
+   "Blink",
+   "Walk",
+   "Spawn",
+   "Attack",
+   "Despawn",
+   "Hit",
+   "Alert"
+  ],
+  "frames": {
+   "Idle": 48,
+   "Blink": 12,
+   "Walk": 24,
+   "Spawn": 36,
+   "Attack": 36,
+   "Despawn": 30,
+   "Hit": 14,
+   "Alert": 24
+  },
+  "cyclic": [
+   "Idle",
+   "Walk"
+  ],
+  "events": {
+   "Attack": {
+    "hit": 14
+   },
+   "Spawn": {
+    "can_act": 30
+   },
+   "Alert": {
+    "noticed": 6
+   }
+  },
+  "fps": 30
+ },
+ "Apprentice": {
+  "clips": [
+   "Idle",
+   "Blink",
+   "Walk",
+   "Run",
+   "Cast_Lumos",
+   "Cast_Levitate",
+   "Pet_Cats",
+   "Cast_Fizzle",
+   "Idle_AFK",
+   "Cast_YarnBall",
+   "Cast_CatPounce",
+   "Cast_PurrHeal",
+   "Cast_GiantPetico"
+  ],
+  "frames": {
+   "Idle": 96,
+   "Blink": 12,
+   "Walk": 32,
+   "Run": 20,
+   "Cast_Lumos": 60,
+   "Cast_Levitate": 84,
+   "Pet_Cats": 84,
+   "Cast_Fizzle": 54,
+   "Idle_AFK": 210,
+   "Cast_YarnBall": 72,
+   "Cast_CatPounce": 66,
+   "Cast_PurrHeal": 72,
+   "Cast_GiantPetico": 96
+  },
+  "cyclic": [
+   "Idle",
+   "Walk",
+   "Run"
+  ],
+  "events": {
+   "Cast_YarnBall": {
+    "spawn_yarn": 14,
+    "first_bounce": 22
+   },
+   "Cast_CatPounce": {
+    "leap": 19,
+    "hit": 31,
+    "cats_back": 58
+   },
+   "Cast_PurrHeal": {
+    "heal_ticks": [
+     18,
+     30,
+     42,
+     54
+    ]
+   },
+   "Cast_GiantPetico": {
+    "zap": 26,
+    "giant": 40,
+    "meow_aoe": 62,
+    "shrink": 74
+   }
+  },
+  "fps": 30
+ }
+}

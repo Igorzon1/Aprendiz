@@ -1,0 +1,14 @@
+# dependências e build (são recriados com npm install / npm run build)
+node_modules/
+dist/
+
+# configurações locais do editor e do Claude
+.claude/
+.vscode/
+.idea/
+*.log
+.DS_Store
+Thumbs.db
+
+# página de teste da interface (só para desenvolvimento)
+ui-test.html

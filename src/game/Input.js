@@ -5,8 +5,9 @@ const MOVE_KEYS = {
   KeyA: [-1, 0], ArrowLeft: [-1, 0],
   KeyD: [1, 0], ArrowRight: [1, 0],
 };
-const ATTACK_KEYS = new Set(['Space', 'KeyJ']);
-const PREVENT = new Set([...Object.keys(MOVE_KEYS), 'Space', 'KeyE', 'KeyJ', 'ShiftLeft', 'ShiftRight']);
+// v0.4: Espaço = esquivar; J / clique esquerdo = raio mágico; botão direito / K = escudo; botão do meio / Z X = girar a câmera.
+const ATTACK_KEYS = new Set(['KeyJ']);
+const PREVENT = new Set([...Object.keys(MOVE_KEYS), 'Space', 'KeyE', 'KeyJ', 'KeyK', 'KeyZ', 'KeyX', 'ShiftLeft', 'ShiftRight']);
 
 export class Input {
   constructor(target = window) {
@@ -14,8 +15,9 @@ export class Input {
     this.keys = new Set();
     this.pressed = new Set(); // teclas apertadas neste quadro (borda de subida)
     this.mouseDown = false;
-    this.rightDown = false;   // botão direito: órbita da câmera
-    this.orbit = { x: 0, y: 0 }; // arrasto acumulado (px) com o botão direito
+    this.rightDown = false;   // botão direito: escudo mágico (segurar)
+    this.middleDown = false;  // botão do meio: órbita da câmera
+    this.orbit = { x: 0, y: 0 }; // arrasto acumulado (px) com o botão do meio
     this.wheel = 0;
     this.pointer = { x: 0, y: 0, inside: false }; // coordenadas normalizadas (-1..1)
     this.attackSource = 'key'; // 'key' | 'mouse': de onde veio o último pedido de ataque
@@ -27,6 +29,7 @@ export class Input {
     target.addEventListener('mouseup', (e) => this._onMouse(e, false));
     target.addEventListener('mousemove', (e) => this._onMove(e));
     target.addEventListener('wheel', (e) => this._onWheel(e), { passive: true });
+    target.addEventListener('auxclick', (e) => { if (this.enabled && e.button === 1) e.preventDefault(); });
     target.addEventListener('blur', () => this.clear());
     target.addEventListener('contextmenu', (e) => { if (this.enabled) e.preventDefault(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden) this.clear(); });
@@ -37,6 +40,7 @@ export class Input {
     this.pressed.clear();
     this.mouseDown = false;
     this.rightDown = false;
+    this.middleDown = false;
     this.orbit.x = this.orbit.y = 0;
   }
 
@@ -56,6 +60,13 @@ export class Input {
   }
 
   _onMouse(e, down) {
+    if (e.button === 1) {
+      if (down && e.target instanceof Element && e.target.closest('button, a, input, select, textarea, [data-ui-block]')) return;
+      if (this.enabled) e.preventDefault();    // sem o "autoscroll" do botão do meio
+      this.middleDown = down && this.enabled;
+      if (down) this._touch();
+      return;
+    }
     if (e.button === 2) {
       if (down && e.target instanceof Element && e.target.closest('button, a, input, select, textarea, [data-ui-block]')) return;
       this.rightDown = down && this.enabled;
@@ -77,7 +88,7 @@ export class Input {
     this.pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
     this.pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
     this.pointer.inside = true;
-    if (this.rightDown) { this.orbit.x += e.movementX || 0; this.orbit.y += e.movementY || 0; }
+    if (this.middleDown) { this.orbit.x += e.movementX || 0; this.orbit.y += e.movementY || 0; }
   }
 
   _onWheel(e) {
@@ -107,11 +118,19 @@ export class Input {
   /** Ataque pedido neste quadro: botão/tecla segurado OU apertado e solto dentro do mesmo quadro. */
   get attackHeld() {
     if (!this.enabled) return false;
-    return this.mouseDown || this.keys.has('Space') || this.keys.has('KeyJ')
-      || this.pressed.has('Mouse0') || this.pressed.has('Space') || this.pressed.has('KeyJ');
+    return this.mouseDown || this.keys.has('KeyJ') || this.pressed.has('Mouse0') || this.pressed.has('KeyJ');
   }
 
-  /** Retorna e zera o arrasto acumulado do botão direito (px). */
+  /** Escudo mágico: botão direito ou K segurados. */
+  get blockHeld() { return this.enabled && (this.rightDown || this.keys.has('KeyK')); }
+
+  /** Esquiva pedida neste quadro (Espaço). */
+  get dodgePressed() { return this.enabled && this.pressed.has('Space'); }
+
+  /** Giro de câmera pelo teclado: -1 (Z) .. +1 (X). */
+  get orbitKeys() { return this.enabled ? (this.keys.has('KeyX') ? 1 : 0) - (this.keys.has('KeyZ') ? 1 : 0) : 0; }
+
+  /** Retorna e zera o arrasto acumulado do botão do meio (px). */
   consumeOrbit(out = { x: 0, y: 0 }) {
     out.x = this.orbit.x; out.y = this.orbit.y;
     this.orbit.x = this.orbit.y = 0;

@@ -65,7 +65,7 @@ export class Combat extends Emitter {
       const cone = mouse ? AIM.coneMouse : AIM.coneKey;
       const df = new THREE.Vector3(d.x, 0, d.z).normalize();
       let best = null, bestAng = cone;
-      for (const e of this.enemies.list) {
+      for (const e of this.enemies.targets('bolt')) {
         if (!e.targetable) continue;
         const dx = e.pos.x - origin.x, dz = e.pos.z - origin.z;
         const dist = Math.hypot(dx, dz);

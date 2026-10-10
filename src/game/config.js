@@ -14,6 +14,25 @@ export const PLAYER = {
   hurtKnockback: 3.8,   // m/s do empurrão do hurt() (distância ~ v^2 / (2*decel))
   hurtLock: 0.1,        // s extras sem controle depois do clip Hit
   afkFallbackEvery: [9, 15], // s entre os "sustos" fofos do AFK sem brinquedo (clip ausente)
+  // v0.4: esquiva (Espaço): rolamento no lugar do clip Dodge (14 quadros), o jogo desloca a Aprendiz.
+  dodge: {
+    distance: 2.4,        // m percorridos na esquiva (avanço rápido)
+    duration: 12 / 30,    // s (= duração do clip Dodge)
+    moveFrom: 0.5 / 30,   // s: o avanço começa na hora (sem agachar antes)
+    moveTo: 9 / 30,       // s: termina (rápido no começo, freando no fim)
+    iframes: 0.32,        // s de invencibilidade (evento iframes_end = quadro 10)
+    cooldown: 0.6,        // s depois do fim do rolamento
+    buffer: 0.18,         // s que o apertar do Espaço fica "guardado" se ela ainda não pode esquivar
+  },
+  // v0.4: escudo mágico (botão direito / K): bolha na frente dela.
+  block: {
+    speedMul: 0.4,        // fração da velocidade ao andar com o escudo
+    coneCos: 0.5,         // cos(60°): bloqueia golpes vindos de um cone frontal de 120°
+    radius: 0.62,         // m: raio da cúpula
+    ahead: 0.36,          // m à frente do centro dela
+    height: 0.46,         // m: altura do centro da cúpula
+    hitHold: 0.16,        // s sem tomar outro "bloqueio" (evita faíscas em dobro)
+  },
 };
 
 export const CAMERA = {
@@ -33,7 +52,7 @@ export const CAMERA = {
   zoomOutMax: 1.32,   // multiplicador da distância em u = -zoomOutRange
   zoomOutRange: 0.3,  // quanto u pode ficar negativo
   zoomLambda: 7,
-  // Órbita com o botão direito.
+  // Órbita com o botão do meio.
   orbitYawSpeed: 0.0062,     // rad por pixel
   orbitPitchSpeed: 0.0042,   // rad por pixel
   orbitLambda: 14,

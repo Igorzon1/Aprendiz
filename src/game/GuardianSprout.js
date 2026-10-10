@@ -19,6 +19,7 @@ export const SPROUT = {
   seek: 6,                // m: procura inimigo a partir da Aprendiz
   enemyGap: 1.3,          // m: nasce a esta distância do inimigo, do lado da Aprendiz
   maxCast: 4.5,           // m: o broto nunca nasce mais longe que isso dela
+  hp: 4,                  // golpes que ele aguenta (os inimigos agora atacam o broto)
   biteRange: 2.5,         // m: alvo = inimigo mais próximo até aqui
   closeRange: 1.3,        // m: até aqui ele morde de perto (bote); mais longe cospe sementes
   biteEvery: 1.2,
@@ -78,12 +79,32 @@ export class GuardianSprout {
     const g = this.game;
     dt = Math.min(dt, 0.05);
     this.cd = Math.max(0, this.cd - dt);
-    if (g.scenes.current !== 'outdoor') {          // saiu do Vale: os brotos ficam para trás
+    if (g.scenes.current === 'house') {            // entrou em casa: os brotos ficam para trás
       if (this.list.length) this.clear();
     } else if (g.input.enabled && g.input.wasPressed('KeyQ')) this._press();
-    if (g.scenes.current !== 'outdoor' && g.state.flags.sproutSpell && g.input.enabled && g.input.wasPressed('KeyQ')) this._say(HINT_INDOORS, 'hint');
+    if (g.scenes.current === 'house' && g.state.flags.sproutSpell && g.input.enabled && g.input.wasPressed('KeyQ')) this._say(HINT_INDOORS, 'hint');
     for (const s of this.list) this._tick(s, dt);
     if (this.list.some((s) => s.dead)) this.list = this.list.filter((s) => !s.dead);
+  }
+
+  /** Sprouts enemies can see and attack (a decoy: they go for it if it's closer than her). */
+  decoys() {
+    const out = [];
+    for (const s of this.list) {
+      if (s.dead || s.state === 'wither' || s.state === 'grow') continue;
+      out.push({ x: s.root.position.x, z: s.root.position.z, ref: s });
+    }
+    return out;
+  }
+
+  /** An enemy hit the sprout: shake, leaf burst, wither when out of hp. */
+  hurt(s, n = 1) {
+    if (!s || s.dead || s.state === 'wither') return;
+    s.hp -= n;
+    s.hurtT = 0.25;
+    const p = s.root.position;
+    this.game.sparkles.burst(p.x, 0.3, p.z, 12, { speed: 1.4, life: 0.5, size: 0.065, gravity: -4, palette: LEAF });
+    if (s.hp <= 0) { s.state = 'wither'; s.wither = 0; s.bite = null; }
   }
 
   clear() {
@@ -119,7 +140,7 @@ export class GuardianSprout {
   /** Onde nasce o broto: perto do inimigo mais próximo (até `seek`) ou a `ahead` metros à frente. */
   pickSpot() {
     const g = this.game, p = g.player;
-    const e = g.enemies.nearest(p.pos, SPROUT.seek);
+    const e = g.enemies.nearest(p.pos, SPROUT.seek, 'sprout');
     let x, z, yaw, faceYaw;
     if (e) {
       const dx = e.pos.x - p.pos.x, dz = e.pos.z - p.pos.z;
@@ -154,7 +175,7 @@ export class GuardianSprout {
     const n = (name) => root.getObjectByName(name);
     const s = {
       root, k, yaw, t: 0, life: SPROUT.lifetime, state: 'grow', dead: false, phase: Math.random() * 6.28,
-      nextBite: 0.9 + Math.random() * 0.3, bite: null, target: null, wither: 0,
+      nextBite: 0.9 + Math.random() * 0.3, bite: null, target: null, wither: 0, hp: SPROUT.hp, hurtT: 0,
       leaves: n('Leaves'), stem: n('Stem'), head: n('Head'), jawT: n('JawTop'), jawB: n('JawBottom'), crown: n('Crown'),
       pending: [], dirtDone: false,
     };
@@ -204,12 +225,18 @@ export class GuardianSprout {
     }
 
     // ---- idle / bite
+    if (s.hurtT > 0) {                       // got hit: a quick squash wobble
+      s.hurtT -= dt;
+      const w = Math.max(0, s.hurtT) / 0.25;
+      s.root.scale.set(s.k * (1 + 0.15 * w), s.k * (1 - 0.18 * w), s.k * (1 + 0.15 * w));
+      if (s.hurtT <= 0) s.root.scale.setScalar(s.k);
+    }
     s.life -= dt;
     if (s.life <= 0) { s.state = 'wither'; s.wither = 0; s.bite = null; return; }
 
     // alvo: inimigo mais próximo ao alcance
-    s.target = g.enemies.nearest(pos, SPROUT.biteRange);
-    const near = g.enemies.nearest(pos, 5);
+    s.target = g.enemies.nearest(pos, SPROUT.biteRange, 'sprout');
+    const near = g.enemies.nearest(pos, 5, 'sprout');
     const lookYaw = near ? yawOf(near.pos.x - pos.x, near.pos.z - pos.z) : s.yaw;
     s.root.rotation.y = dampAngle(s.root.rotation.y, lookYaw, 8, dt);
 
@@ -322,7 +349,7 @@ export class GuardianSprout {
   _damage(s, e) {
     const g = this.game;
     if (!e.targetable) return;
-    g.enemies.damageAt({ x: e.pos.x, y: e.pos.y + 0.2, z: e.pos.z }, 0.25, SPROUT.biteDamage, s.root.position);
+    g.enemies.damageAt({ x: e.pos.x, y: e.pos.y + 0.2, z: e.pos.z }, 0.25, SPROUT.biteDamage, s.root.position, 'sprout');
     if (Math.random() < 0.35) g.texts.spawn('Nhac!', e.pos.x, e.pos.y + 0.7, e.pos.z, { scale: 0.5 });
   }
 }

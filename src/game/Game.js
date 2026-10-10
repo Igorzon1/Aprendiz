@@ -7,6 +7,11 @@ import { Combat } from './Combat.js';
 import { Enemies } from './Enemies.js';
 import { GardenMinigame } from './GardenMinigame.js';
 import { GuardianSprout } from './GuardianSprout.js';
+import { Puffs, DUST_COLORS } from './Fx.js';
+import { FOREST_LOOK } from './configForest.js';
+import { ForestScene } from './ForestScene.js';
+import { ForestStory } from './ForestStory.js';
+import { MagicShield } from './MagicShield.js';
 import { Npc } from './Npc.js';
 import { OutdoorWorld } from './OutdoorWorld.js';
 import { PlayerVitals } from './PlayerVitals.js';
@@ -64,9 +69,11 @@ export class Game {
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 80);
     this.cameraRig = new CameraRig(this.camera);
     this.postfx = new Postfx(renderer, this.scene, this.camera);
+    this.baseBloom = { strength: RENDER.bloom.strength, radius: RENDER.bloom.radius, threshold: RENDER.bloom.threshold };
     this.sparkles = new Sparkles(this.scene);
     this.texts = new FloatingTexts(this.scene);
     this.marker = new PointerMarker(this.scene);
+    this.puffs = new Puffs(this);
 
     this.input = new Input(window);
     this.state = createGameState();
@@ -107,6 +114,16 @@ export class Game {
       this.outdoorWorld.setActive(false);
       this.outdoorNav = new Nav(this.outdoorCollision, this.outdoorWorld.bounds, navOpts);
       this.outdoorWorld.on('area', (a) => this.ui.showAreaTitle?.(a.title, a.subtitle));
+    }
+    // v0.4: a Floresta Sombria (World02.glb)
+    this.forestWorld = null;
+    const fm = models.forest;
+    if (fm && !fm.placeholder && fm.scene) {
+      this.forestCollision = new Collision();
+      this.forestWorld = new OutdoorWorld(this.scene, fm, this.forestCollision, { name: 'World02', look: FOREST_LOOK, deferred: ['COL_ArenaGate'] });
+      this.forestWorld.setActive(false);
+      this.forestNav = new Nav(this.forestCollision, this.forestWorld.bounds, navOpts);
+      this.forestWorld.on('area', (a) => this.ui.showAreaTitle?.(a.title, a.subtitle));
     }
     this.transitioning = false;
 
@@ -193,6 +210,14 @@ export class Game {
     }
     this.sprout = new GuardianSprout(this);    // v0.3: tecla Q, depois do mini game
     this.addSystem(this.sprout);
+    if (this.outdoorWorld) { this.forestStory = new ForestStory(this); this.addSystem(this.forestStory); }   // v0.4: gancho + barreira
+    if (this.forestWorld) { this.forest = new ForestScene(this); this.addSystem(this.forest); }
+    // v0.4: esquiva (poeirinha) e escudo mágico
+    this.shield = new MagicShield(this);
+    this.addSystem(this.shield);
+    this.addSystem(this.puffs);
+    this.player.on('dodge', (x, z, dx, dz) => this.puffs.puff(x - dx * 0.1, 0.04, z - dz * 0.1, { colors: DUST_COLORS, count: 7, scale: 1.1, rise: 0.3 }));
+    this.player.on('dodgeEnd', (x, z) => this.puffs.puff(x, 0.04, z, { colors: DUST_COLORS, count: 5, scale: 0.9, rise: 0.2 }));
     this.cameraRig.resolveActor = (spec) => this._cameraActor(spec);
     this._setHouseOccluders();
     this.cameraRig.snapTo(this.player.pos);
@@ -200,6 +225,10 @@ export class Game {
     if ((qs.get('scene') === 'outdoor' || qs.get('garden') === '1') && this.outdoorWorld) {
       this.story.flags.peticoBack = true;
       this.scenes.apply('outdoor');
+    }
+    if ((qs.get('forest') === '1' || qs.get('boss') === '1') && this.forestWorld) {      // dev: direto na Floresta Sombria / na arena
+      this.story.flags.peticoBack = true;
+      this.scenes.apply('forest');
     }
 
     // Pausa: Esc alterna o painel da UI (ignorado antes de começar e com a estante aberta).
@@ -216,6 +245,7 @@ export class Game {
   /** Atores para a câmera (setShot): nome ('Aprendiz', 'Yumi', 'Divonica'...) -> {pos, yaw, kind}. */
   _cameraActor(spec) {
     if (spec === 'Aprendiz' || spec === 'player') return { pos: this.player.pos, yaw: this.player.yaw, kind: 'apprentice' };
+    if (spec === 'Druida' && this.forest?.boss) return { pos: this.forest.boss.pos, yaw: this.forest.boss.yaw, kind: 'apprentice' };
     const cat = this.cats[spec];
     if (cat) return { pos: cat.pos, yaw: cat.yaw, kind: 'cat' };
     const npc = this.npcs?.[spec];
@@ -257,9 +287,10 @@ export class Game {
     this.input.clear();
     this.input.enabled = true;
     const q = new URLSearchParams(location.search);
-    if (q.get('skip') === '1' || q.get('scene') === 'outdoor' || q.get('garden') === '1') this._devSkip(q);
+    if (q.get('skip') === '1' || q.get('scene') === 'outdoor' || q.get('garden') === '1' || q.get('forest') === '1' || q.get('boss') === '1') this._devSkip(q);
     else this.story.play('opening');
     if (this.scenes.current === 'outdoor') this._onSceneEntered('outdoor', !this.story.flags['done:divonicaMeet']);
+    else if (this.scenes.current === 'forest') this.forest?.onEntered(false);
   }
 
   /** Parâmetros de desenvolvimento: ?skip=1 (sem a abertura) e ?scene=outdoor (já começa lá fora). */
@@ -279,6 +310,7 @@ export class Game {
     petico.brain.mode = 'free';
     if (q.get('wand') === '1') this.state.flags.hasWand = true;
     if (q.get('garden') === '1') this._devGarden(q);
+    if (q.get('forest') === '1' || q.get('boss') === '1') this._devForest(q);
   }
 
   /** ?garden=1: começa ao ar livre, com a varinha, diante do portão da horta (?gphase=water|grow pula parte do mini game). */
@@ -296,8 +328,27 @@ export class Game {
     if (ph === 'done') this.state.flags.sproutSpell = true;
   }
 
+  /** ?forest=1: começa na Floresta Sombria (varinha + Broto Guardião); ?boss=1: diante da arena do Druida. */
+  _devForest(q) {
+    this.state.flags.hasWand = true;
+    this.state.flags.sproutSpell = true;
+    applyWandVisibility(this.state, this.wands);
+    this.story.flags['done:divonicaMeet'] = true;
+    this.story.flags['done:forestHook'] = true;
+    if (q.get('boss') === '1') {
+      const e = this.forestWorld.spawns.ArenaEntry;
+      if (e) {
+        this.player.teleport(e.pos.x, e.pos.z, e.yaw);
+        let i = 0;
+        for (const cat of this._activeCats()) cat.teleport(e.pos.x + (i++ % 2 ? 0.8 : -0.8), e.pos.z + 0.9, e.yaw);
+      }
+    }
+    this.cameraRig.snapTo(this.player.pos);
+  }
+
   /** Terminou de entrar num cenário (depois do fade). */
   _onSceneEntered(name, first) {
+    if (name === 'forest') { this.forest?.onEntered(first); return; }
     if (name !== 'outdoor') return;
     if (first && !this.story.flags['done:divonicaMeet'] && this.npcs.Divonica) this.story.play('divonicaMeet');
   }
@@ -305,6 +356,12 @@ export class Game {
   /** Depois de cair: volta à porta de casa (por fora), com vida cheia e os Sombritos de volta aos seus lugares. */
   async respawnAfterDefeat() {
     this.player.revive();
+    if (this.scenes.current === 'forest' && this.forest) {            // v0.4: volta ao anel de cogumelos, o chefe reinicia
+      this.transitioning = true;
+      await this.forest.respawn();
+      this.transitioning = false;
+      return;
+    }
     this.transitioning = true;
     const sp = this.outdoorWorld?.spawns.FromHouse;
     if (this.scenes.current !== 'outdoor') this.scenes.apply('outdoor');
@@ -350,16 +407,24 @@ export class Game {
       return;
     }
 
-    // câmera: roda = zoom, botão direito = órbita, C = close
+    // câmera: roda = zoom, botão do meio arrastando ou Z/X = órbita, C = close
     const wheel = input.consumeWheel();
     if (wheel) this.cameraRig.addZoom(wheel);
-    if (input.rightDown || input.orbit.x || input.orbit.y) {
+    if (input.middleDown || input.orbit.x || input.orbit.y) {
       const o = input.consumeOrbit();
       this.cameraRig.addOrbit(o.x, o.y);
     }
+    if (input.orbitKeys) this.cameraRig.addOrbit(input.orbitKeys * 300 * dt, 0);
     if (input.enabled && input.wasPressed('KeyC')) this.cameraRig.toggleCloseup();
 
-    // ataque básico (Espaço, J, clique): só se a história/interação deixar
+    // escudo: com o mouse ela encara o ponteiro; com o teclado (K) segue a direção do movimento
+    if (input.rightDown && input.pointer.inside) this.player.blockAim = this._groundPoint(input.pointer);
+    else if (this.player.blocking) {             // keyboard block (K): turn the bubble toward the nearest threat
+      const near = this.enemies?.nearest?.(this.player.pos, 4.5);
+      this.player.blockAim = near ? { x: near.pos.x, z: near.pos.z } : null;
+    } else this.player.blockAim = null;
+
+    // ataque básico (J ou clique esquerdo): só se a história/interação deixar
     if (input.attackHeld && this.player.attackCooldown <= 0) {
       let aim = null;
       if (input.attackSource === 'mouse' && input.pointer.inside) aim = this._groundPoint(input.pointer);
@@ -376,7 +441,7 @@ export class Game {
     }
 
     this.world.update(dt, this.player.pos, this.player.pos);
-    if (this.scenes.current === 'outdoor') this.enemies.update(dt);
+    if (this.scenes.current !== 'house') this.enemies.update(dt);
     for (const npc of Object.values(this.npcs)) npc.update(dt);
     this.vitals.update(dt);
     this.strawberries.update(dt);
@@ -428,6 +493,7 @@ export class Game {
   /** Função (out)=>Vector3 com o ponto de mundo onde a cauda do balão deve cair. */
   _anchorFor(spec) {
     if (spec === 'Aprendiz' || spec === 'player') return null;
+    if (spec === 'Druida' && this.forest?.boss) return (out) => this.forest.boss.headWorld(out).y += 0.45;
     const cat = this.cats[spec];
     if (cat) return (out) => out.set(cat.pos.x, cat.pos.y + 0.33, cat.pos.z);
     const npc = this.npcs?.[spec];

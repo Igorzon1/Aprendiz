@@ -16,6 +16,9 @@
    "Surprised",
    "Hit",
    "Defeat",
+   "Dodge",
+   "Block",
+   "Block_Hit",
    "Idle_AFK_Toy",
    "ReceiveWand",
    "Cheer",
@@ -40,6 +43,9 @@
    "Surprised": 40,
    "Hit": 16,
    "Defeat": 48,
+   "Dodge": 12,
+   "Block": 40,
+   "Block_Hit": 10,
    "Idle_AFK_Toy": 210,
    "ReceiveWand": 60,
    "Cheer": 36,
@@ -51,7 +57,8 @@
   "cyclic": [
    "Idle",
    "Walk",
-   "Run"
+   "Run",
+   "Block"
   ],
   "events": {
    "Cast_YarnBall": {
@@ -91,6 +98,14 @@
    },
    "Defeat": {
     "plop": 29
+   },
+   "Dodge": {
+    "roll_start": 1,
+    "iframes_end": 9,
+    "roll_end": 9
+   },
+   "Block_Hit": {
+    "hit": 0
    },
    "Idle_AFK": {
     "sparkle_on": 40,
@@ -291,6 +306,13 @@
    "Run",
    "Cast_DarkMagic",
    "Idle_AFK",
+   "Hit",
+   "Defeat",
+   "Taunt",
+   "Cast_ThornRain",
+   "Dash",
+   "Cast_Wave",
+   "Cast_BunnyBomb",
    "Cast_BlackLightning",
    "Cast_ShadowRoots",
    "Cast_Summon"
@@ -302,6 +324,13 @@
    "Run": 18,
    "Cast_DarkMagic": 60,
    "Idle_AFK": 180,
+   "Hit": 14,
+   "Defeat": 50,
+   "Taunt": 40,
+   "Cast_ThornRain": 36,
+   "Dash": 20,
+   "Cast_Wave": 30,
+   "Cast_BunnyBomb": 40,
    "Cast_BlackLightning": 60,
    "Cast_ShadowRoots": 66,
    "Cast_Summon": 72
@@ -333,6 +362,30 @@
      -0.58,
      0.0
     ]
+   },
+   "Hit": {
+    "flinch": 2
+   },
+   "Defeat": {
+    "down": 36,
+    "end": 50
+   },
+   "Taunt": {
+    "laugh": 8
+   },
+   "Cast_ThornRain": {
+    "rain": 16
+   },
+   "Dash": {
+    "go": 5,
+    "stop": 15
+   },
+   "Cast_Wave": {
+    "wave": 14
+   },
+   "Cast_BunnyBomb": {
+    "throw": 14,
+    "back": 32
    }
   },
   "fps": 30
@@ -393,7 +446,8 @@
    "Attack",
    "Despawn",
    "Hit",
-   "Alert"
+   "Alert",
+   "Attack_Bite"
   ],
   "frames": {
    "Idle": 48,
@@ -403,7 +457,8 @@
    "Attack": 36,
    "Despawn": 30,
    "Hit": 14,
-   "Alert": 24
+   "Alert": 24,
+   "Attack_Bite": 24
   },
   "cyclic": [
    "Idle",
@@ -418,6 +473,95 @@
    },
    "Alert": {
     "noticed": 6
+   },
+   "Attack_Bite": {
+    "hit": 10
+   }
+  },
+  "fps": 30
+ },
+ "ShadowBrute": {
+  "clips": [
+   "Idle",
+   "Blink",
+   "Walk",
+   "Spawn",
+   "Attack",
+   "Despawn",
+   "Hit",
+   "Alert",
+   "Attack_Slam"
+  ],
+  "frames": {
+   "Idle": 48,
+   "Blink": 12,
+   "Walk": 32,
+   "Spawn": 36,
+   "Attack": 36,
+   "Despawn": 30,
+   "Hit": 14,
+   "Alert": 24,
+   "Attack_Slam": 40
+  },
+  "cyclic": [
+   "Idle",
+   "Walk"
+  ],
+  "events": {
+   "Attack": {
+    "hit": 14
+   },
+   "Spawn": {
+    "can_act": 30
+   },
+   "Alert": {
+    "noticed": 6
+   },
+   "Attack_Slam": {
+    "slam": 19
+   }
+  },
+  "fps": 30
+ },
+ "ShadowSpitter": {
+  "clips": [
+   "Idle",
+   "Blink",
+   "Walk",
+   "Spawn",
+   "Attack",
+   "Despawn",
+   "Hit",
+   "Alert",
+   "Attack_Spit"
+  ],
+  "frames": {
+   "Idle": 48,
+   "Blink": 12,
+   "Walk": 24,
+   "Spawn": 36,
+   "Attack": 36,
+   "Despawn": 30,
+   "Hit": 14,
+   "Alert": 24,
+   "Attack_Spit": 32
+  },
+  "cyclic": [
+   "Idle",
+   "Walk"
+  ],
+  "events": {
+   "Attack": {
+    "hit": 14
+   },
+   "Spawn": {
+    "can_act": 30
+   },
+   "Alert": {
+    "noticed": 6
+   },
+   "Attack_Spit": {
+    "spit": 14
    }
   },
   "fps": 30

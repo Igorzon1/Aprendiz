@@ -41,6 +41,15 @@ const TEMPLATE = `
   </div>
   <div class="ui-prompt"><div class="ui-prompt-pill"></div></div>
   <div class="ui-hint"><div class="ui-hint-pill"></div></div>
+  <div class="ui-boss" hidden>
+    <div class="ui-boss-card">
+      <p class="ui-boss-name"></p>
+      <div class="ui-boss-track" role="progressbar" aria-valuemin="0">
+        <div class="ui-boss-damage"></div>
+        <div class="ui-boss-fill"></div>
+      </div>
+    </div>
+  </div>
   <div class="ui-counters" hidden></div>
   <div class="ui-area">
     <div class="ui-area-card">
@@ -128,21 +137,25 @@ function parsePrompt(text) {
 
 const AREA_HOLD_MS = 2500;  // faixa de região visível por este tempo (+ 500 ms de fade)
 const TOAST_MAX = 3;        // máximo de notificações empilhadas
+const BOSS_OUT_MS = 380;    // descida da barra de chefe antes de sumir (ver CSS)
 
-// Controles mostrados na pausa. "/" e "+" viram separadores entre as teclas.
+// Controles mostrados na pausa. "/" e "+" viram separadores entre as teclas; "(texto)" vira nota pequena.
 const CONTROLS = [
   ['WASD / setas', 'Andar'],
   ['Shift', 'Correr'],
+  ['Espaço', 'Esquivar'],
+  ['J / clique esquerdo', 'Magia'],
+  ['Botão direito (segurar) / K', 'Escudo'],
+  ['Q', 'Broto Guardião'],
   ['E', 'Interagir'],
-  ['Espaço / J / clique', 'Ataque mágico'],
+  ['Botão do meio / Z / X', 'Girar câmera'],
   ['Roda do mouse', 'Zoom'],
-  ['Botão direito + arrastar', 'Girar a câmera'],
   ['C', 'Close no rosto'],
   ['Esc', 'Pausa'],
 ];
 
 function controlParts(text) {
-  return text.split(/\s*([\/+])\s*/).filter((p) => p !== '');
+  return text.split(/\s*([\/+]|\([^)]*\))\s*/).filter((p) => p !== '');
 }
 
 const SPINE_HEIGHTS = [248, 262, 240, 270, 254, 244, 266]; // alturas variadas das lombadas (px)
@@ -241,6 +254,12 @@ export class UI {
     this._promptPill = $('.ui-prompt-pill');
     this._hint = $('.ui-hint');
     this._hintPill = $('.ui-hint-pill');
+    this._boss = $('.ui-boss');
+    this._bossCard = $('.ui-boss-card');
+    this._bossName = $('.ui-boss-name');
+    this._bossTrack = $('.ui-boss-track');
+    this._bossFill = $('.ui-boss-fill');
+    this._bossDamage = $('.ui-boss-damage');
     this._fade = $('.ui-fade');
     this._counters = $('.ui-counters');
     this._area = $('.ui-area');
@@ -275,6 +294,9 @@ export class UI {
     this._loadTimer = 0;
     this._hpShown = false;
     this._hpCur = null;
+    this._hpMax = null;
+    this._bossPct = null;   // null = barra escondida
+    this._bossTimer = 0;
     this._promptOn = false;
     this._hintTimer = 0;
     this._titleWait = null;
@@ -515,12 +537,69 @@ export class UI {
       restartClass(hp, 'is-in');
     }
     if (this._hpCur !== null && c < this._hpCur) restartClass(this._hpTrack, 'is-hurt');
+    // Máximo subiu (ex.: 5 -> 6): pulso de comemoração. Não conta como dano.
+    if (this._hpMax !== null && mx > this._hpMax) restartClass(hp, 'is-grow');
     this._hpCur = c;
+    this._hpMax = mx;
 
     this._hpFill.style.width = `${pct.toFixed(1)}%`;
     this._hpNum.textContent = `${c}/${mx}`;
     hp.classList.toggle('is-low', pct <= 25);
     hp.classList.toggle('is-mid', pct > 25 && pct <= 50);
+  }
+
+  // Barra de chefe: faixa larga no centro-inferior, acima da dica. A primeira chamada faz a barra subir;
+  // as seguintes só atualizam. A parte rosa (dano) fica para trás e desliza depois de cada golpe,
+  // e a barra treme quando a vida cai. Chamar de novo com o mesmo valor não muda nada.
+  showBossBar(name, hp, max) {
+    const mx = Math.max(0, Number(max) || 0);
+    const cur = clamp(Number(hp) || 0, 0, mx);
+    const pct = mx > 0 ? (cur / mx) * 100 : 0;
+    const label = String(name ?? '');
+    const prev = this._bossPct;
+
+    clearTimeout(this._bossTimer);
+    this._bossName.textContent = label;
+    this._bossTrack.setAttribute('aria-label', label);
+    this._bossTrack.setAttribute('aria-valuemax', String(mx));
+    this._bossTrack.setAttribute('aria-valuenow', String(cur));
+    this.el.classList.add('has-boss');
+
+    if (prev === null) {
+      // Sem transição na primeira pintura: a barra já nasce no valor certo e só sobe.
+      this._bossFill.style.transition = 'none';
+      this._bossDamage.style.transition = 'none';
+      this._bossFill.style.width = `${pct.toFixed(1)}%`;
+      this._bossDamage.style.width = `${pct.toFixed(1)}%`;
+      this._boss.hidden = false;
+      this._boss.classList.remove('is-out');
+      restartClass(this._boss, 'is-in');
+      this._bossFill.style.transition = '';
+      this._bossDamage.style.transition = '';
+    } else {
+      const hurt = pct < prev;
+      // Cura: o dano acompanha na hora. Golpe: o dano espera e só depois desliza.
+      this._bossDamage.classList.toggle('is-heal', pct > prev);
+      this._bossFill.style.width = `${pct.toFixed(1)}%`;
+      this._bossDamage.style.width = `${pct.toFixed(1)}%`;
+      if (hurt) restartClass(this._bossCard, 'is-hurt');
+    }
+    this._bossPct = pct;
+  }
+
+  // Desce a barra de chefe com fade e a esconde. Sem barra ativa, não faz nada.
+  hideBossBar() {
+    if (this._bossPct === null) return;
+    this._bossPct = null;
+    const boss = this._boss;
+    this.el.classList.remove('has-boss');
+    boss.classList.remove('is-in');
+    boss.classList.add('is-out');
+    clearTimeout(this._bossTimer);
+    this._bossTimer = setTimeout(() => {
+      boss.hidden = true;
+      boss.classList.remove('is-out');
+    }, BOSS_OUT_MS);
   }
 
   // Contador de coleta no canto superior direito, ex.: setCounter('morangos', '🍓', 3, 12) -> "3/12".
@@ -800,6 +879,11 @@ export class UI {
           sep.className = 'ui-sep';
           sep.textContent = part;
           tdKeys.appendChild(sep);
+        } else if (part.startsWith('(')) {
+          const note = document.createElement('span');
+          note.className = 'ui-note';
+          note.textContent = part;
+          tdKeys.appendChild(note);
         } else {
           const cap = document.createElement('kbd');
           cap.className = 'ui-key';

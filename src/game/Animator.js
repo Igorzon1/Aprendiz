@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { Emitter } from './util.js';
 
 /** Clips cíclicos (ver contrato): Idle, Walk, Run, Sit_Idle, Purr e os que terminam em `_Loop`. */
-const LOOP_CLIPS = new Set(['Idle', 'Walk', 'Run', 'Sit_Idle', 'Purr', 'Talk']);
+const LOOP_CLIPS = new Set(['Idle', 'Walk', 'Run', 'Sit_Idle', 'Purr', 'Talk', 'Block']);
 export const isLoopClip = (name) => LOOP_CLIPS.has(name) || name.endsWith('_Loop');
 
 /** Eventos padrão (quadro @30fps) usados quando o animations.json ainda não os traz. */
@@ -18,7 +18,7 @@ const DEFAULT_EVENTS = {
 const DEFAULT_DURATION = {
   WakeUp: 2.2, Attack_Basic: 0.7, Interact: 1.1, Surprised: 1.0, Idle_AFK: 3.0, Hit: 0.5,
   SitDown: 0.8, StandUp: 0.8, Groom: 2.6, Stretch: 1.6, Pounce: 1.0, Meow: 1.0, Startled: 0.7,
-  ReceiveWand: 2.4, Cheer: 1.3, Defeat: 1.6, Idle_AFK_Toy: 4.0,
+  ReceiveWand: 2.4, Cheer: 1.3, Defeat: 1.6, Idle_AFK_Toy: 4.0, Dodge: 0.47, Block_Hit: 0.33, Taunt: 1.3,
   Wave: 1.4, Excited: 1.4, GiveWand: 2.0, Point: 1.0,
 };
 

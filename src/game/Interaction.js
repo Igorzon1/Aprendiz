@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { canTrainOnDummy } from './Progression.js';
 import { pick } from './util.js';
+import { LINES_DIVONICA_AFTER_BOSS, LINES_DIVONICA_AFTER_HOOK } from './configForest.js';
 import {
   DOOR_PROMPT_LOCKED, LINES_BENCH, LINES_MAILBOX, LINES_NPC_DIVONICA, LINES_POND, LINES_SIGN, LINES_WELL,
   LINE_DOOR_HUNGRY, LINE_DOOR_WAIT_PETICO, LINE_GATE,
@@ -147,6 +148,10 @@ export class Interaction {
         case 'pond': await this._talk(item, LINES_POND, { anim: false }); break;
         case 'bench': await this._bench(item); break;
         case 'gate': await this._gate(item); break;
+        case 'forest_enter': await this.game.forestStory.enter(); break;                 // v0.4: Floresta Sombria
+        case 'to_vale': await this.game.forest.toVale(); break;
+        case 'checkpoint': await this.game.forest.checkpoint(item); break;
+        case 'druid_friend': await this.game.forest.druidChat(); break;
         case 'gardenbook': case 'wateringcan': await this.game.garden?.interact(item); break;   // v0.3: Horta Mágica
         case 'npc': await this._npcTalk(item); break;
         case 'window': await this._talk(item, LINES.window, { anim: false }); break;
@@ -192,6 +197,7 @@ export class Interaction {
 
   async _gate(item) {
     const g = this.game;
+    if (item.id === 'INT_Gate_Forest' && g.forestStory) { await g.forestStory.interact(item); return; }
     await g.player.turnTo(item.pos);
     g.sparkles.burst(item.pos.x, 0.9, item.pos.z, 10, { speed: 0.8, life: 0.7, size: 0.06, gravity: 0.2 });
     await g.say(LINE_GATE(item.area ?? 'este lugar'));
@@ -202,8 +208,15 @@ export class Interaction {
     const g = this.game;
     const npc = g.npcs.Divonica;
     if (!npc) return;
+    const g0 = this.game;
+    if (g0.state.flags.sproutSpell && !g0.story.flags['done:forestHook']) {          // v0.4: o gancho da Floresta Sombria
+      await g0.story.play('forestHook');
+      return;
+    }
     this._npcLine = (this._npcLine ?? -1) + 1;
-    const line = LINES_NPC_DIVONICA[this._npcLine % LINES_NPC_DIVONICA.length];
+    const pool = g0.story.flags.druidDefeated ? [...LINES_DIVONICA_AFTER_BOSS, ...LINES_NPC_DIVONICA]
+      : g0.story.flags['done:forestHook'] ? [...LINES_DIVONICA_AFTER_HOOK, ...LINES_NPC_DIVONICA] : LINES_NPC_DIVONICA;
+    const line = pool[this._npcLine % pool.length];
     await g.player.turnTo(npc.pos);
     npc.faceTo(g.player.pos.x, g.player.pos.z);
     npc.setIdleClip('Talk');

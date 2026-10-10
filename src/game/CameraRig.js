@@ -12,7 +12,7 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 /**
  * Câmera 3/4 de cima que segue a Aprendiz.
  *  - roda do mouse: zoom contínuo u (-0.3 .. 1) do enquadramento "tático" (u = 0) ao "retrato" (u = 1), com curva suave;
- *  - botão direito arrastando: gira (yaw) e inclina (pitch); dentro de casa o yaw é limitado;
+ *  - botão do meio arrastando (ou Z/X): gira (yaw) e inclina (pitch); dentro de casa o yaw é limitado;
  *  - C: alterna o close;
  *  - setShot(): tomadas de câmera de cutscene (Promise); setSceneMode(): casa x ar livre;
  *  - setOccluders(): paredes que somem quando tapam a visão.
@@ -100,7 +100,7 @@ export class CameraRig {
     else this.zoomTarget = Math.min(0.5, this._zoomBeforeClose);
   }
 
-  /** Arrasto com o botão direito (pixels). */
+  /** Arrasto com o botão do meio (pixels). */
   addOrbit(dx, dy) {
     if (this.shot || (!dx && !dy)) return;
     this.orbitYaw -= dx * CAMERA.orbitYawSpeed;
@@ -206,8 +206,8 @@ export class CameraRig {
     if (this.extra && this.extraWeight > 0.001) {
       const p = this.extra();
       if (p) {
-        out.x += (p.x - out.x) * this.extraWeight * 0.55;
-        out.z += (p.z - out.z) * this.extraWeight * 0.55;
+        out.x += (p.x - out.x) * this.extraWeight * 0.45;
+        out.z += (p.z - out.z) * this.extraWeight * 0.45;
       }
     }
     return this._clampFocus(out);
@@ -253,6 +253,14 @@ export class CameraRig {
     let wantYaw = this.baseYaw + this._orbitYawS;
     let wantFocus = this._desired(target, velocity, _s2, k, this._wantAim);
     let dist = this._wantDist, pitch = this._wantPitch, aim = this._wantAim;
+    // fight framing: back the camera off as the point of interest (the boss) gets farther, so both stay in view
+    if (this.extra && this.extraWeight > 0.001 && !this.shot) {
+      const p = this.extra();
+      if (p) {
+        const sep = Math.hypot(p.x - target.x, p.z - target.z);
+        dist = Math.max(dist, lerp(dist, Math.min(11, 2.4 + sep * 0.85), this.extraWeight));
+      }
+    }
     let lam = lerp(CAMERA.damping, CAMERA.dampingPortrait, k);
 
     const s = this.shot;

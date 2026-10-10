@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { isLoopClip } from './Animator.js';
+import { OBJ_ENTER_FOREST } from './configForest.js';
 import { yawOf } from './util.js';
 
 /** Pontos de cena que podem faltar no House.glb: tenta estes substitutos em ordem. */
@@ -159,6 +160,10 @@ export class StoryWorld {
     if (name === 'catsLook') {
       const p = this.point(args.at);
       if (p) for (const cat of this.game._activeCats()) cat.brain.react('look', { pos: p });
+      return Promise.resolve();
+    }
+    if (name === 'forestObjective') {          // v0.4: novo objetivo
+      this.game.ui.setObjective?.(OBJ_ENTER_FOREST);
       return Promise.resolve();
     }
     if (name === 'divonicaHome') {            // volta ao posto perto da horta e fica em Idle

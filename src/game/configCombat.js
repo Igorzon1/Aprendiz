@@ -12,6 +12,8 @@ export const VITALS = {
 
 /** Sombrito (ShadowMinion.glb). */
 export const SOMBRITO = {
+  model: 'ShadowMinion',
+  attacks: ['Attack', 'Attack_Bite'],   // picked at random (clips missing from the GLB are skipped)
   hp: 3,
   radius: 0.17,           // colisão com o mundo e entre eles
   height: 0.45,           // altura do modelo (para colisão com caixas baixas e teste dos raios)
@@ -79,3 +81,29 @@ export const BOLT_HIT = {
   minY: -0.15,
   maxY: 1.1,
 };
+
+/** Variants: Sombrão (big, slow, ground slam) and Sombrito Cuspidor (keeps its distance and spits). */
+export const SOMBRITO_VARIANTS = {
+  brute: {
+    model: 'ShadowBrute', attacks: ['Attack_Slam', 'Attack_Slam', 'Attack'],
+    hp: 8, radius: 0.3, height: 0.8, centerY: 0.4,
+    wanderSpeed: 0.5, chaseSpeed: 1.25, leashSpeed: 1.2, walkNominal: 1.4,
+    notice: 5.5, attackRange: 1.3, holdRange: 1.05, hitRange: 1.5, attackCooldown: 2.2, damage: 2, lunge: 0.6,
+    knockback: 1.1, hurtStun: 0.22, minDist: 0.62, separation: 0.9, playerKeepOff: 0.85,
+    slamRadius: 1.45, slamOffset: 0.85, slamWarn: 0.62,
+  },
+  spitter: {
+    model: 'ShadowSpitter', attacks: ['Attack_Spit'],
+    hp: 2, chaseSpeed: 1.55, ranged: true, rangeMin: 2.6, rangeMax: 5.0, attackRange: 5.4,
+    attackCooldown: 1.9, notice: 6,
+  },
+};
+
+/** Inimigos tentando atravessar o escudo mágico são empurrados para fora da bolha. */
+export const SHIELD_PUSH = { reach: 1.05, cone: 0.15, bounce: 2.2 };
+
+/** Cuspe do Sombrito Cuspidor: bolinha reta (esquiva ou escudo resolvem). */
+export const SPIT = { speed: 5.4, life: 2.2, radius: 0.16, y: 0.3, damage: 1 };
+
+/** Broto Guardião como isca: os inimigos preferem ele se estiver até esta folga mais perto que a Aprendiz. */
+export const DECOY_BIAS = 1.2;

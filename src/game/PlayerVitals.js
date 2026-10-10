@@ -13,6 +13,7 @@ export class PlayerVitals extends Emitter {
     this.game = game;
     this.health = new Health(VITALS.maxHp);
     this.invuln = 0;
+    this.lastResult = null;   // 'hurt' | 'dodged' | 'blocked' | 'invuln' (o último hit())
     this.defeated = false;
     this.shown = false;
     this._blinkT = 0;
@@ -45,11 +46,20 @@ export class PlayerVitals extends Emitter {
   }
 
   /** Um inimigo acertou. `from` = onde ele estava (empurra para longe). */
-  hit(dmg, fromX, fromZ) {
+  hit(dmg, fromX, fromZ, { unblockable = false } = {}) {
+    this.lastResult = 'invuln';
     if (this.defeated || this.invuln > 0) return false;
     const p = this.game.player;
     if (p.defeated) return false;
+    if (p.iframes > 0) { this.lastResult = 'dodged'; this.emit('dodged'); return false; }              // esquiva: invencível
+    if (!unblockable && p.blockCovers(fromX, fromZ)) {                                                // escudo: golpe frontal bloqueado
+      if (p.blockHitCd <= 0) p.onBlocked(fromX, fromZ);
+      this.lastResult = 'blocked';
+      this.emit('blocked');
+      return false;
+    }
     if (!this.health.damage(dmg)) return false;
+    this.lastResult = 'hurt';
     this.invuln = VITALS.invulnerable;
     this._blinkT = 0;
     this.game.enemies?.fx.hurtSpark(p.pos.x, p.pos.y + 0.5, p.pos.z);
@@ -62,6 +72,11 @@ export class PlayerVitals extends Emitter {
       p.hurt(fromX, fromZ);
     }
     return true;
+  }
+
+  /** Recompensa: +n de vida máxima (e enche a barra). */
+  addMax(n = 1) {
+    this.health.setMax(this.health.max + n, true);
   }
 
   heal(n = 1) {

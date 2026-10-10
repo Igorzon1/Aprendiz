@@ -28,9 +28,12 @@ npm run build
 | WASD ou setas | Andar |
 | Shift | Correr |
 | E | Interagir |
-| Espaço, J ou clique | Magia (depois de ganhar a varinha) |
+| Espaço | Esquivar (rolamento com invencibilidade) |
+| J ou clique esquerdo | Raio mágico (depois de ganhar a varinha) |
+| Botão direito (segurar) ou K | Escudo mágico: bloqueia golpes de frente, anda devagar |
+| Q | Broto Guardião (depois da horta) |
 | Roda do mouse | Zoom (até o rosto) |
-| Botão direito + arrastar | Girar a câmera |
+| Botão do meio + arrastar, ou Z / X | Girar a câmera |
 | C | Close no rosto |
 | Esc | Pausa |
 

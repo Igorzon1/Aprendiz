@@ -4,12 +4,11 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { Animator } from './Animator.js';
 import { EnemyBrain, ST } from './EnemyBrain.js';
-import { SOMBRITO as C } from './configCombat.js';
+import { SOMBRITO as C, SOMBRITO_VARIANTS } from './configCombat.js';
 import { Health } from './Health.js';
 import { Emitter, angleDiff, clamp, dampAngle, easeOutBack, yawOf } from './util.js';
 
 const BASE = import.meta.env.BASE_URL || '/';
-const MODEL_URL = `${BASE}assets/models/ShadowMinion.glb`;
 const DATA_URL = `${BASE}assets/data/animations.json`;
 
 /** Eventos (quadro @30fps) usados quando o animations.json não os traz ou o clip ainda não existe. */
@@ -22,7 +21,7 @@ const DEFAULT_EVENTS = {
 // =================================================================================================
 // Carregamento do modelo (ShadowMinion.glb), com cache e placeholder caso o arquivo não exista
 // =================================================================================================
-let _loading = null;
+const _loading = {};   // GLB name -> Promise (one load per variant model)
 
 const isGLB = (buf) => !!buf && buf.byteLength > 12 && new DataView(buf).getUint32(0, true) === 0x46546c67;
 
@@ -59,28 +58,28 @@ function buildPlaceholderMinion() {
   return g;
 }
 
-async function loadAsset(assets) {
+async function loadAsset(assets, name = 'ShadowMinion') {
   // 1. O agente de assets pode passar a carregar o Sombrito no futuro: se já estiver lá, usa.
-  const given = assets?.models?.shadowMinion ?? assets?.models?.minion ?? assets?.models?.sombrito;
+  const given = name === 'ShadowMinion' ? (assets?.models?.shadowMinion ?? assets?.models?.minion ?? assets?.models?.sombrito) : null;
   if (given?.scene) {
     return { scene: given.scene, clips: given.clips ?? new Map(), events: mergeEvents(given.events), fps: given.fps ?? 30, placeholder: false };
   }
 
-  let events = assets?.animData?.ShadowMinion?.events;
-  let fps = assets?.animData?.ShadowMinion?.fps ?? 30;
+  let events = assets?.animData?.[name]?.events;
+  let fps = assets?.animData?.[name]?.fps ?? 30;
   if (!events) {
     try {
       const res = await fetch(DATA_URL);
       if (res.ok) {
         const d = JSON.parse(await res.text());
-        events = d.ShadowMinion?.events;
-        fps = d.ShadowMinion?.fps ?? fps;
+        events = d[name]?.events;
+        fps = d[name]?.fps ?? fps;
       }
     } catch { /* usa os eventos padrão */ }
   }
 
   try {
-    const res = await fetch(MODEL_URL);
+    const res = await fetch(`${BASE}assets/models/${name}.glb`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const buf = await res.arrayBuffer();
     if (!isGLB(buf)) throw new Error('não é um GLB');
@@ -89,7 +88,7 @@ async function loadAsset(assets) {
     const gltf = await loader.parseAsync(buf, `${BASE}assets/models/`);
     const clips = new Map();
     for (const clip of gltf.animations) {
-      clip.name = clip.name.replace(/^ShadowMinion_/, '');
+      clip.name = clip.name.replace(new RegExp(`^${name}_`), '');
       clips.set(clip.name, clip);
     }
     gltf.scene.traverse((o) => {
@@ -103,15 +102,15 @@ async function loadAsset(assets) {
     });
     return { scene: gltf.scene, clips, events: mergeEvents(events), fps, placeholder: false };
   } catch (err) {
-    console.warn('[Enemy] ShadowMinion.glb indisponível, usando Sombrito placeholder:', err?.message ?? err);
+    console.warn(`[Enemy] ${name}.glb indisponível, usando Sombrito placeholder:`, err?.message ?? err);
     return { scene: buildPlaceholderMinion(), clips: new Map(), events: mergeEvents(events), fps, placeholder: true };
   }
 }
 
 /** Carrega (uma vez) o modelo e os dados de animação do Sombrito. Promise com {scene, clips, events, fps}. */
-export function loadSombritoAsset(assets = null) {
-  if (!_loading) _loading = loadAsset(assets);
-  return _loading;
+export function loadSombritoAsset(assets = null, name = 'ShadowMinion') {
+  _loading[name] ??= loadAsset(assets, name);
+  return _loading[name];
 }
 
 // =================================================================================================
@@ -146,21 +145,23 @@ export class Enemy extends Emitter {
    * @param {{scene:THREE.Object3D, clips:Map, events:object, fps:number}} asset
    * @param {{id:string, x:number, z:number, yaw?:number, territory?:number}} o
    */
-  constructor(ctx, asset, { id, x, z, yaw = 0, territory = C.territoryDefault }) {
+  constructor(ctx, asset, { id, x, z, yaw = 0, territory = C.territoryDefault, variant = 'base' }) {
     super();
+    this.variant = variant;
+    this.C = { ...C, ...(SOMBRITO_VARIANTS[variant] ?? {}) };
     this.ctx = ctx;
     this.id = id;
     this.territory = territory;
     this.spawn = { x, z, yaw };
-    this.radius = C.radius;
-    this.height = C.height;
+    this.radius = this.C.radius;
+    this.height = this.C.height;
 
     this.root = new THREE.Group();
     this.root.name = id;
     this.body = new THREE.Group(); // squash, pulinho e escala procedural ficam aqui
     this.root.add(this.body);
     this.model = cloneSkinned(asset.scene);
-    this.model.scale.multiplyScalar(C.modelScale);
+    this.model.scale.multiplyScalar(this.C.modelScale);
     this.body.add(this.model);
 
     // materiais próprios (o clarão é por instância)
@@ -184,7 +185,7 @@ export class Enemy extends Emitter {
     this.animator.on('event', (clip, evt) => this.emit('animEvent', clip, evt));
     this.animator.on('finished', (clip) => this._onFinished(clip));
 
-    this.health = new Health(C.hp);
+    this.health = new Health(this.C.hp);
 
     this.pos = this.root.position;
     this.yaw = yaw;
@@ -233,8 +234,8 @@ export class Enemy extends Emitter {
   get dead() { return this.health.isDead; }
 
   /** Centro (para mirar) em coordenadas de mundo. */
-  centerWorld(out = new THREE.Vector3()) { return out.set(this.pos.x, this.pos.y + C.centerY, this.pos.z); }
-  headWorld(out = new THREE.Vector3()) { return out.set(this.pos.x, this.pos.y + C.height + 0.12, this.pos.z); }
+  centerWorld(out = new THREE.Vector3()) { return out.set(this.pos.x, this.pos.y + this.C.centerY, this.pos.z); }
+  headWorld(out = new THREE.Vector3()) { return out.set(this.pos.x, this.pos.y + this.C.height + 0.12, this.pos.z); }
   distTo(x, z) { return Math.hypot(this.pos.x - x, this.pos.z - z); }
 
   place(x, z, yaw = this.yaw) {
@@ -321,8 +322,8 @@ export class Enemy extends Emitter {
     const lethal = this.health.isDead;
     this.flash = 1;
     this.squash(lethal ? 1 : 0.85);
-    if (fromX !== null) this.kick(this.pos.x - fromX, this.pos.z - fromZ, lethal ? C.knockback * 1.15 : C.knockback);
-    this.ctx.fx.hitSpark(this.pos.x, this.pos.y + C.centerY, this.pos.z);
+    if (fromX !== null) this.kick(this.pos.x - fromX, this.pos.z - fromZ, lethal ? this.C.knockback * 1.15 : this.C.knockback);
+    this.ctx.fx.hitSpark(this.pos.x, this.pos.y + this.C.centerY, this.pos.z);
     this.brain.onDamaged(lethal);
     this.emit('damaged', this, applied);
     return true;
@@ -404,8 +405,8 @@ export class Enemy extends Emitter {
     for (const n of this.ctx.neighborsOf(this)) {
       const dx = pos.x - n.pos.x, dz = pos.z - n.pos.z;
       const d = Math.hypot(dx, dz) || 1e-4;
-      if (d < C.separation) {
-        const push = ((C.separation - d) / C.separation) * 0.9;
+      if (d < this.C.separation) {
+        const push = ((this.C.separation - d) / this.C.separation) * 0.9;
         wantVx += (dx / d) * push;
         wantVz += (dz / d) * push;
       }
@@ -414,8 +415,8 @@ export class Enemy extends Emitter {
     if (pp) {
       const dx = pos.x - pp.x, dz = pos.z - pp.z;
       const d = Math.hypot(dx, dz) || 1e-4;
-      if (d < C.playerKeepOff) {
-        const push = ((C.playerKeepOff - d) / C.playerKeepOff) * 1.3;
+      if (d < this.C.playerKeepOff) {
+        const push = ((this.C.playerKeepOff - d) / this.C.playerKeepOff) * 1.3;
         wantVx += (dx / d) * push;
         wantVz += (dz / d) * push;
       }
@@ -425,7 +426,7 @@ export class Enemy extends Emitter {
     const dvx = wantVx - this.vx, dvz = wantVz - this.vz;
     const dl = Math.hypot(dvx, dvz);
     if (dl > 1e-5) {
-      const rate = (Math.hypot(wantVx, wantVz) > Math.hypot(this.vx, this.vz) ? C.accel : C.decel) * dt;
+      const rate = (Math.hypot(wantVx, wantVz) > Math.hypot(this.vx, this.vz) ? this.C.accel : this.C.decel) * dt;
       const k = Math.min(1, rate / dl);
       this.vx += dvx * k;
       this.vz += dvz * k;
@@ -454,7 +455,7 @@ export class Enemy extends Emitter {
     let targetYaw = null;
     if (this.face) targetYaw = yawOf(this.face.x - pos.x, this.face.z - pos.z);
     else if (Math.hypot(this.vx, this.vz) > 0.09) targetYaw = yawOf(this.vx, this.vz);
-    if (targetYaw !== null) this.yaw = dampAngle(this.yaw, targetYaw, C.turnLambda * (this.face ? 1.3 : 1), dt);
+    if (targetYaw !== null) this.yaw = dampAngle(this.yaw, targetYaw, this.C.turnLambda * (this.face ? 1.3 : 1), dt);
     this.root.rotation.y = this.yaw;
   }
 
@@ -464,8 +465,8 @@ export class Enemy extends Emitter {
     for (const n of this.ctx.neighborsOf(this)) {
       const dx = pos.x - n.pos.x, dz = pos.z - n.pos.z;
       const d = Math.hypot(dx, dz);
-      if (d < C.minDist) {
-        const push = (C.minDist - d) * 0.5;
+      if (d < this.C.minDist) {
+        const push = (this.C.minDist - d) * 0.5;
         const nx = d > 1e-4 ? dx / d : 1, nz = d > 1e-4 ? dz / d : 0;
         pos.x += nx * push; pos.z += nz * push;
       }
@@ -485,7 +486,7 @@ export class Enemy extends Emitter {
 
   _visuals(dt) {
     // clarão
-    this.flash = Math.max(0, this.flash - C.flash * dt);
+    this.flash = Math.max(0, this.flash - this.C.flash * dt);
     for (const m of this.mats) m.userData.flash.value = this.flash;
 
     // squash: mola amortecida em torno de 0
@@ -530,7 +531,7 @@ export class Enemy extends Emitter {
     else if (commanded || this.speed > 0.14) this.moving = true;
 
     if (this.moving) {
-      const ts = clamp(Math.max(this.speed, C.walkNominal * 0.4) / C.walkNominal, 0.6, 2.2);
+      const ts = clamp(Math.max(this.speed, this.C.walkNominal * 0.4) / this.C.walkNominal, 0.6, 2.2);
       if (this.curLoco !== 'Walk') {
         this.animator.play('Walk', { fade: 0.15, timeScale: ts });
         this.curLoco = 'Walk';

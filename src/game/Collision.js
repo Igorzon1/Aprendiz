@@ -21,6 +21,15 @@ export class Collision {
     });
   }
 
+  /** Remove (no lugar: o array é compartilhado) todas as caixas com esse nome. Retorna quantas saíram. */
+  removeBox(name) {
+    let n = 0;
+    for (let i = this.boxes.length - 1; i >= 0; i--) if (this.boxes[i].name === name) { this.boxes.splice(i, 1); n++; }
+    return n;
+  }
+
+  hasBox(name) { return this.boxes.some((b) => b.name === name); }
+
   /** Passa a usar as caixas/limites de outra Collision (troca de cenário sem trocar referências). */
   adopt(other) {
     this.boxes = other.boxes;

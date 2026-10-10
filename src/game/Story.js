@@ -31,7 +31,7 @@
 // Textos das falas. Para mudar uma fala, mude só aqui.
 export const LINE_OPENING = 'Hmm... que fome. Será que tem alguma coisa na geladeira?';
 export const HINT_CONTROLS = 'WASD ou setas para andar · Shift corre · E interage';
-export const HINT_CONTROLS_WAND = 'WASD ou setas para andar · Shift corre · E interage · Espaço ataca';
+export const HINT_CONTROLS_WAND = 'WASD ou setas para andar · Shift corre · E interage · J ataca · Espaço esquiva';
 export const LINE_FRIDGE_HINT = 'Dica: a geladeira está ali na cozinha. Aperte E perto dela.';
 export const LINE_FRIDGE_NUDGE = 'Que tal dar uma olhadinha na geladeira?';
 export const LINE_FRIDGE_DREAM = 'Isso me parece um sonho.';
@@ -43,8 +43,10 @@ export const LINE_PETICO_ANSWER = { speaker: 'Petico', text: 'Miau...' };
 export const LINE_DIVONICA_WAND = 'Espera! Isso é seu? É igualzinha à varinha da Hermione! Madeira de videira, fibra de coração de dragão, uns 27 centímetros...';
 export const LINE_APPRENTICE_WAND = 'A varinha da Hermione... agora é minha?!';
 export const LINE_DIVONICA_WARN_1 = 'Cuidado! A Floresta Sombria, aqui ao oeste, está cheia de Sombritos bravinhos. Eles não gostam de visita!';
-export const LINE_DIVONICA_WARN_2 = 'Se um deles vier, aponte a varinha e aperte Espaço, J ou clique: é raio mágico neles!';
-export const HINT_ATTACK = 'Espaço, J ou clique: raio mágico · Esc: pausa · C: close · botão direito: girar a câmera';
+export const LINE_DIVONICA_WARN_2 = 'Se um deles vier, aponte a varinha e aperte J (ou clique): é raio mágico neles! E o Espaço esquiva, tá?';
+export const HINT_ATTACK = 'J ou clique: raio mágico · Espaço: esquivar · botão direito: escudo · botão do meio ou Z/X: girar a câmera · Esc: pausa';
+
+import { LINE_HOOK_1, LINE_HOOK_2, LINE_HOOK_3 } from './configForest.js';
 
 export const STORY = {
   // v0.2, primeira vez que ela sai de casa: a Divonica vem correndo, acena e entrega a varinha.
@@ -93,6 +95,36 @@ export const STORY = {
       { type: 'camera', shot: 'default' },
       { type: 'action', name: 'divonicaHome' },
       { type: 'hint', text: HINT_ATTACK, ms: 9000 },
+      { type: 'control', locked: false },
+    ],
+  },
+
+  // v0.4: depois do Broto Guardião, a Divonica conta que os Sombritos roubam os morangos para o Druida Sombrio.
+  forestHook: {
+    once: true,
+    steps: [
+      { type: 'control', locked: true },
+      { type: 'lookAt', actor: 'Aprendiz', target: 'Divonica' },
+      {
+        type: 'parallel',
+        branches: [
+          [{ type: 'moveTo', actor: 'Divonica', to: 'player', speed: 2.8, stopDist: 1.5 }],
+          [{ type: 'camera', shot: 'twoShot', a: 'Aprendiz', b: 'Divonica' }],
+        ],
+      },
+      { type: 'lookAt', actor: 'Divonica', target: 'player' },
+      { type: 'lookAt', actor: 'Aprendiz', target: 'Divonica' },
+      { type: 'camera', shot: 'closeup', target: 'Divonica', other: 'Aprendiz' },
+      { type: 'playClip', actor: 'Divonica', clip: 'Excited', background: true },
+      { type: 'say', speaker: 'Divonica', text: LINE_HOOK_1, duration: 7200 },
+      { type: 'playClip', actor: 'Divonica', clip: 'Talk', background: true },
+      { type: 'say', speaker: 'Divonica', text: LINE_HOOK_2, duration: 5200 },
+      { type: 'playClip', actor: 'Divonica', clip: 'Point', background: true },
+      { type: 'say', speaker: 'Divonica', text: LINE_HOOK_3, duration: 7200 },
+      { type: 'playClip', actor: 'Divonica', clip: 'Idle', background: true },
+      { type: 'camera', shot: 'default' },
+      { type: 'action', name: 'forestObjective' },
+      { type: 'action', name: 'divonicaHome' },
       { type: 'control', locked: false },
     ],
   },

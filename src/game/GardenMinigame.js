@@ -5,8 +5,8 @@ import { clamp, damp, dampAngle, easeOutBack, pick, smoothstep, yawOf } from './
 // =============================================================================================
 // v0.3: Horta Mágica. Lê os nós do World01.glb (GPlant_##, GPlant_##_Dry/_Leaves/_Berries, WateringCan, GardenBook,
 // Prop_RedBerry, INT_GardenBook, INT_WateringCan) e roda o mini game:
-//   fase 1 'water': levitar o regador e regar os 6 pés murchos (segurar Espaço em cima de cada um);
-//   fase 2 'grow' : segurar Espaço perto de um pé regado, o medidor enche pulsando, soltar na faixa verde;
+//   fase 1 'water': levitar o regador e regar os 6 pés murchos (segurar J / clique em cima de cada um);
+//   fase 2 'grow' : segurar J / clique perto de um pé regado, o medidor enche pulsando, soltar na faixa verde;
 //   recompensa    : flags.sproutSpell = true (tecla Q: GuardianSprout.js).
 // É um "system" do Game (update(dt)); as interações chegam por interact(item) (Interaction.js).
 // =============================================================================================
@@ -55,11 +55,11 @@ const LESSON_LINES = [
   'Nota de rodapé: "O regador NÃO é um chapéu. Já testamos." Anotado.',
 ];
 const BOOK_AGAIN_WATER = [
-  'Lição dois: com o regador flutuando, segure Espaço em cima de cada pé murcho. Pacientemente.',
-  'O livro repete: regador, Espaço, pé murcho. Ele não é de enrolar.',
+  'Lição dois: com o regador flutuando, segure J (ou o clique) em cima de cada pé murcho. Pacientemente.',
+  'O livro repete: regador, J, pé murcho. Ele não é de enrolar.',
 ];
 const BOOK_AGAIN_GROW = [
-  'Lição três: perto de um pé regado, segure Espaço e solte quando o medidor estiver na faixa verde.',
+  'Lição três: perto de um pé regado, segure J (ou o clique) e solte quando o medidor estiver na faixa verde.',
   'Segurar demais faz o morango crescer demais. O livro avisa em letras miúdas.',
 ];
 const BOOK_DONE = [
@@ -70,8 +70,8 @@ const CAN_NO_WAND = 'Sem a varinha, o regador vai continuar no chão. Ele é tei
 const CAN_BEFORE_BOOK = 'Um regador azul bem simpático. Aposto que o livro, ali no portão, sabe o que fazer com ele.';
 const CAN_LIFT = ['Sobe, sobe, regadorzinho!', 'Vai, regador! Sem derramar na minha cabeça, por favor.', 'Levita, levita... isso, bonitão.'];
 const CAN_USED = ['O regador já cumpriu a missão de hoje. Merece um descanso.', 'Deixa ele descansar. Foi um dia de muita água.'];
-const LINE_WATER_DONE = 'Seis pés molhadinhos! Agora o incentivo mágico: segurar Espaço perto de um deles.';
-const HINT_GROW = 'Segure Espaço perto de um pé regado e solte na faixa verde';
+const LINE_WATER_DONE = 'Seis pés molhadinhos! Agora o incentivo mágico: segurar J / clique perto de um deles.';
+const HINT_GROW = 'Segure J (ou o clique esquerdo) perto de um pé regado e solte na faixa verde';
 const LINES_GROW_OK = ['Isso! Flores e morangos!', 'Que lindeza de pé de morango!', 'Cresceu direitinho. Sou boa nisso!'];
 const LINES_EARLY = ['Ainda faltou um tiquinho...', 'Cedo demais! Ele só espreguiçou.', 'Quase! Respira e tenta de novo.'];
 const LINES_GIANT = [
@@ -443,7 +443,7 @@ export class GardenMinigame {
     this.ownsAttack = false;
 
     if (canActive && free) {
-      this.ownsAttack = true;                       // com o regador no ar, Espaço é "regar", nunca raio
+      this.ownsAttack = true;                       // com o regador no ar, J / clique é "regar", nunca raio
       this.target = this._pickWaterTarget();
       this.pouring = held && !p.busy;
       if (this.pouring && this.target) this._water(this.target, dt);
@@ -452,7 +452,7 @@ export class GardenMinigame {
     if (this.phase === 'grow' && free) {
       const wet = this._nearestWet();
       if (wet) {
-        this.ownsAttack = true;                     // perto de um pé regado, Espaço é "crescer"
+        this.ownsAttack = true;                     // perto de um pé regado, J / clique é "crescer"
         this.target = wet;
         if (rising && !p.busy) this._startChannel(wet);
       }
@@ -643,6 +643,7 @@ export class GardenMinigame {
   async _complete() {
     const g = this.game;
     this.phase = 'done';
+    this.celebrating = true;               // v0.4: a Divonica só puxa assunto depois da comemoração
     await this._delay(GARDEN.celebrateAfter);
     g.state.flags.sproutSpell = true;
     g.ui.setObjective?.(OBJ_GROW, GARDEN.total, GARDEN.total);
@@ -650,6 +651,7 @@ export class GardenMinigame {
     g.sparkles.burst(g.player.pos.x, g.player.pos.y + 0.9, g.player.pos.z, 40, { speed: 2.2, life: 1.2, size: 0.09, gravity: -0.6, palette: GOLD_PALETTE });
     this._catsCome();
     for (const line of LINES_DONE) await g.say(line, { duration: 4200 });
+    this.celebrating = false;
   }
 
   /** Os gatos correm para perto da Aprendiz e ficam olhando (reação "geladeira": corre até o ponto, mia, olha). */

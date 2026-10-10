@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Animator } from './Animator.js';
 import { PLAYER } from './config.js';
-import { Emitter, angleDiff, clamp, damp, dampAngle, turnToward, yawOf } from './util.js';
+import { Emitter, angleDiff, clamp, damp, dampAngle, smoothstep, turnToward, yawOf } from './util.js';
 
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
@@ -19,6 +19,9 @@ const FALLBACKS = {
   Defeat: ['Surprised', 'Idle'],
   Cheer: ['Excited', 'Surprised', 'Idle'],
   ReceiveWand: ['Interact', 'Idle'],
+  Dodge: ['Run', 'Idle'],
+  Block: ['Idle'],
+  Block_Hit: ['Surprised', 'Idle'],
 };
 
 /** Clips de AFK: o osso que os gatos perseguem e os eventos que ligam/desligam a brincadeira. */
@@ -65,6 +68,14 @@ export class Player extends Emitter {
     this.turn = null;         // {yaw, resolve, t}
     this.script = null;       // movimento roteirizado {x,z,speed,stopDist,resolve}
     this.attackCooldown = 0;
+    // v0.4: esquiva (Espaço) e escudo mágico (botão direito / K)
+    this.dodging = null;      // {t, dirX, dirZ, k}
+    this.dodgeCd = 0;
+    this.dodgeBuf = 0;
+    this.iframes = 0;         // s de invencibilidade da esquiva (PlayerVitals respeita)
+    this.blocking = false;
+    this.blockAim = null;     // {x, z}: o Game passa o ponto do mouse (ou null com o teclado)
+    this.blockHitCd = 0;
     this.canCast = () => true; // gancho: o Game liga na varinha (Progression)
     this.hasWand = () => true; // gancho: AFK com varinha (brilho) ou sem (brinquedo de barbante)
     this.defeated = false;
@@ -98,6 +109,8 @@ export class Player extends Emitter {
     if (this.busy) this._endBusy();
     if (this.script) { const r = this.script.resolve; this.script = null; r(); }
     if (this.turn) { const r = this.turn.resolve; this.turn = null; r(); }
+    this.dodging = null;
+    this.blocking = false;
     this.pos.set(x, 0, z);
     this.yaw = yaw;
     this.root.rotation.y = yaw;
@@ -111,6 +124,7 @@ export class Player extends Emitter {
   hurt(fromX, fromZ) {
     if (this.defeated) return Promise.resolve();
     this._stopAfkPlay();
+    this.dodging = null;
     let dx = this.pos.x - fromX, dz = this.pos.z - fromZ;
     const l = Math.hypot(dx, dz);
     if (l < 1e-3) { dx = -Math.sin(this.yaw); dz = -Math.cos(this.yaw); } else { dx /= l; dz /= l; }
@@ -126,6 +140,8 @@ export class Player extends Emitter {
     if (this.defeated) return Promise.resolve();
     this._stopAfkPlay();
     this.defeated = true;
+    this.dodging = null;
+    this.blocking = false;
     this.vx = this.vz = 0;
     this.script = null;
     this.turn = null;
@@ -135,6 +151,9 @@ export class Player extends Emitter {
   /** Levanta de novo e devolve os controles. */
   revive() {
     this.defeated = false;
+    this.dodging = null;
+    this.iframes = 0;
+    this.dodgeCd = 0;
     if (this.busy) this._endBusy();
     this.vx = this.vz = this.speed = 0;
     this.locoName = null;
@@ -217,6 +236,7 @@ export class Player extends Emitter {
   }
 
   _onFinished(clip) {
+    if (clip === 'Block_Hit' && this.locoName === 'Block_Hit') { this.locoName = null; return; }
     if (this.busy && this.busy.name === clip) { this._endBusy(); return; }
     if (AFK_PLAY[clip] && this.locoName === clip) {
       this._stopAfkPlay();
@@ -238,9 +258,78 @@ export class Player extends Emitter {
     return new Promise((resolve) => { this.script = { x, z, speed, stopDist, resolve, t: 0 }; });
   }
 
-  /** Ataque básico (Espaço/J/clique). `aim` = ponto de mira opcional (mouse). */
+  // --------------------------------------------------------------------------------------------
+  // v0.4: esquiva e escudo
+  // --------------------------------------------------------------------------------------------
+  _canDodge() {
+    if (!this.input.enabled || this.locked || this.defeated || this.script || this.dodging || this.dodgeCd > 0) return false;
+    const b = this.busy;
+    return !b || b.name === 'Attack_Basic' || b.cancelable;
+  }
+
+  _startDodge(dirX, dirZ) {
+    const D = PLAYER.dodge;
+    if (this.busy) this._endBusy();
+    this._stopAfkPlay();
+    if (this.turn) { const r = this.turn.resolve; this.turn = null; r(); }
+    this.blocking = false;
+    this.dodging = { t: 0, dirX, dirZ, k: 0 };
+    this.iframes = D.iframes;
+    this.yaw = yawOf(dirX, dirZ);
+    this.root.rotation.y = this.yaw;
+    this.attackCooldown = Math.max(this.attackCooldown, 0.25);
+    this.animator.play('Dodge', { fade: 0.04, fallback: FALLBACKS.Dodge });
+    this.locoName = 'Dodge';
+    this.input.lastActivity = performance.now();
+    this.emit('dodge', this.pos.x, this.pos.z, dirX, dirZ);
+  }
+
+  _updateDodge(dt) {
+    const D = PLAYER.dodge, d = this.dodging;
+    d.t += dt;
+    const u = clamp((d.t - D.moveFrom) / (D.moveTo - D.moveFrom), 0, 1);
+    const k = 1 - (1 - u) ** 3;                    // ease-out: snappy start, soft stop
+    const step = D.distance * (k - d.k);
+    d.k = k;
+    if (step > 0) {
+      const px = this.pos.x, pz = this.pos.z;
+      this.collision.move(this.pos, d.dirX * step, d.dirZ * step, PLAYER.radius, PLAYER.height);
+      const real = Math.hypot(this.pos.x - px, this.pos.z - pz) / Math.max(dt, 1e-4);
+      this.vx = d.dirX * real; this.vz = d.dirZ * real; this.speed = real;
+    } else { this.vx = this.vz = this.speed = 0; }
+    this.root.rotation.y = this.yaw;
+    this.animator.update(dt);
+    if (d.t >= D.duration) {
+      this.dodging = null;
+      this.locoName = null;
+      this.dodgeCd = D.cooldown;
+      this.vx = d.dirX * 0.4; this.vz = d.dirZ * 0.4;
+      this.emit('dodgeEnd', this.pos.x, this.pos.z);
+    }
+  }
+
+  /** O golpe vindo de (fromX, fromZ) bate na bolha (cone frontal de ~120 graus)? */
+  blockCovers(fromX, fromZ) {
+    if (!this.blocking || this.defeated || typeof fromX !== 'number' || typeof fromZ !== 'number') return false;
+    const dx = fromX - this.pos.x, dz = fromZ - this.pos.z;
+    const l = Math.hypot(dx, dz);
+    if (l < 1e-3) return true;
+    return (dx * Math.sin(this.yaw) + dz * Math.cos(this.yaw)) / l >= PLAYER.block.coneCos;
+  }
+
+  /** Um golpe foi bloqueado: Block_Hit, empurrãozinho e evento 'blocked' (o Game faz a faísca). */
+  onBlocked(fromX, fromZ) {
+    this.blockHitCd = PLAYER.block.hitHold;
+    this.animator.play('Block_Hit', { fade: 0.04, fallback: FALLBACKS.Block_Hit });
+    this.locoName = 'Block_Hit';
+    const dx = this.pos.x - fromX, dz = this.pos.z - fromZ, l = Math.hypot(dx, dz) || 1;
+    this.vx += (dx / l) * 1.4; this.vz += (dz / l) * 1.4;
+    this.emit('blocked', fromX, fromZ);
+  }
+
+  /** Ataque básico (J / clique). `aim` = ponto de mira opcional (mouse). */
   tryAttack(aim = null, { force = false } = {}) {
-    if ((this.locked && !force) || this.busy || this.script || this.attackCooldown > 0) return false;
+    if ((this.locked && !force) || this.busy || this.script || this.attackCooldown > 0 || this.dodging || this.blocking) return false;
     if (!this.canCast()) { this.attackCooldown = 0.35; return false; }
     this.attackCooldown = PLAYER.attackCooldown;
     const faceYaw = aim ? yawOf(aim.x - this.pos.x, aim.z - this.pos.z) : null;
@@ -259,6 +348,10 @@ export class Player extends Emitter {
   update(dt) {
     const input = this.input;
     this.attackCooldown = Math.max(0, this.attackCooldown - dt);
+    this.dodgeCd = Math.max(0, this.dodgeCd - dt);
+    this.dodgeBuf = Math.max(0, this.dodgeBuf - dt);
+    this.iframes = Math.max(0, this.iframes - dt);
+    this.blockHitCd = Math.max(0, this.blockHitCd - dt);
 
     if (this.defeated) {          // caída: segura a última pose do Defeat
       this.vx = this.vz = this.speed = 0;
@@ -277,6 +370,18 @@ export class Player extends Emitter {
       const l = Math.hypot(dirX, dirZ) || 1;
       dirX /= l; dirZ /= l;
     }
+
+    // --- esquiva (Espaço): rolamento com invencibilidade; o pedido fica guardado por um instante
+    if (input.dodgePressed) this.dodgeBuf = PLAYER.dodge.buffer;
+    if (this.dodgeBuf > 0 && this._canDodge()) {
+      if (hasInput) this._startDodge(dirX, dirZ);
+      else { this.forward(_fwd); this._startDodge(_fwd.x, _fwd.z); }
+      this.dodgeBuf = 0;
+    }
+    if (this.dodging) { this._updateDodge(dt); return; }
+
+    // --- escudo (botão direito / K): precisa da varinha, não pode estar em ação
+    this.blocking = input.blockHeld && !this.locked && !this.busy && !this.script && this.hasWand();
 
     // --- ocupado (ação de uma vez)?
     const busy = this.busy;
@@ -304,8 +409,8 @@ export class Player extends Emitter {
       wantSpeed = scriptDir.speed;
       run = scriptDir.speed > (PLAYER.walkSpeed + PLAYER.runSpeed) / 2;
     } else if (canMove && hasInput) {
-      run = input.run;
-      wantSpeed = run ? PLAYER.runSpeed : PLAYER.walkSpeed;
+      run = input.run && !this.blocking;
+      wantSpeed = this.blocking ? PLAYER.walkSpeed * PLAYER.block.speedMul : (run ? PLAYER.runSpeed : PLAYER.walkSpeed);
       if (this.turn) { this.turn.resolve(); this.turn = null; } // o jogador assumiu o controle
     }
 
@@ -320,7 +425,9 @@ export class Player extends Emitter {
     }
 
     // --- virar
-    if (wantSpeed > 0) {
+    if (this.blocking && this.blockAim) {
+      this.yaw = dampAngle(this.yaw, yawOf(this.blockAim.x - this.pos.x, this.blockAim.z - this.pos.z), 16, dt);
+    } else if (wantSpeed > 0) {
       this.yaw = dampAngle(this.yaw, yawOf(dirX, dirZ), PLAYER.turnLambda, dt);
     } else if (this.turn) {
       const t = this.turn;
@@ -345,6 +452,15 @@ export class Player extends Emitter {
   }
 
   _updateLocomotion(moving, run, dt) {
+    if (this.blocking) {
+      if (this.locoName === 'Block_Hit') return;
+      if (this.locoName !== 'Block') {
+        this._stopAfkPlay();
+        this.animator.play('Block', { fade: 0.1, fallback: FALLBACKS.Block });
+        this.locoName = 'Block';
+      }
+      return;
+    }
     const now = performance.now();
     const input = this.input;
     const idleFor = (now - input.lastActivity) / 1000;

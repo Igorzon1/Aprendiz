@@ -32,13 +32,16 @@ export class OutdoorWorld extends Emitter {
    * @param {{scene:THREE.Object3D}} asset
    * @param {import('./Collision.js').Collision} collision
    */
-  constructor(scene, asset, collision) {
+  constructor(scene, asset, collision, opts = {}) {
     super();
+    this.lookCfg = opts.look ?? OUTDOOR_LOOK;
+    this.deferredNames = new Set(opts.deferred ?? []);
+    this.deferredBoxes = {};
     this.scene = scene;
     this.collision = collision;
     this.kind = 'outdoor';
     this.root = asset.scene;
-    this.root.name = 'World01';
+    this.root.name = opts.name ?? 'World01';
     this.lightGroup = new THREE.Group();
     this.lightGroup.name = 'OutdoorLights';
     scene.add(this.root, this.lightGroup);
@@ -57,6 +60,7 @@ export class OutdoorWorld extends Emitter {
     this.fridgeLight = null;
     this.strawberryTemplate = null;
     this.npcSpot = null;      // {pos, yaw}
+    this.fogPoints = [];      // FOG_## (Floresta): {pos, size, kind}
     this.time = 0;
     this.area = null;
 
@@ -66,7 +70,8 @@ export class OutdoorWorld extends Emitter {
       const n = o.name || '';
       const ud = o.userData || {};
       if (n.startsWith('COL_')) {
-        collision.addBox(worldBox(o), n);
+        if (this.deferredNames.has(n)) this.deferredBoxes[n] = worldBox(o);   // só vale depois (ex.: portão da arena)
+        else collision.addBox(worldBox(o), n);
         toHide.push(o);
       } else if (n.startsWith('INT_')) {
         this.interactables.push({
@@ -85,16 +90,18 @@ export class OutdoorWorld extends Emitter {
           name: n.slice(5), title: String(ud.title ?? n.slice(5)), subtitle: String(ud.subtitle ?? ''),
           radius: Number(ud.radius) || 8, pos: o.getWorldPosition(new THREE.Vector3()),
         });
-      } else if (/^ITEM_Strawberry_\d+$/.test(n)) {
+      } else if (/^ITEM_(Strawberry|Stolen)_\d+$/.test(n)) {
         this.items.push({ id: n, pos: o.getWorldPosition(new THREE.Vector3()) });
       } else if (n.startsWith('ENEMY_')) {
         const p = o.getWorldPosition(new THREE.Vector3());
         this.enemyNodes.push({ id: n, x: p.x, z: p.z, yaw: nodeYaw(o), territory: Number(ud.territory) || 3.5 });
+      } else if (n.startsWith('FOG_')) {
+        this.fogPoints.push({ pos: o.getWorldPosition(new THREE.Vector3()), size: Number(ud.size) || 3, kind: Number(ud.kind) || 0 });
       } else if (n === 'NPC_Divonica') {
         this.npcSpot = { pos: o.getWorldPosition(new THREE.Vector3()), yaw: nodeYaw(o) };
       } else if (n.startsWith('LIGHT_')) {
         this._makeLight(o);
-      } else if (n === 'Prop_GoldenStrawberry') {
+      } else if (n === 'Prop_GoldenStrawberry' || n === 'Prop_RedStrawberry') {
         this.strawberryTemplate = o;
         toHide.push(o);
       }
@@ -103,22 +110,36 @@ export class OutdoorWorld extends Emitter {
     this.items.sort((a, b) => a.id.localeCompare(b.id));
     this.enemyNodes.sort((a, b) => a.id.localeCompare(b.id));
 
-    const H = WORLD_HALF - 1.5;
-    this.bounds = { minX: -H, maxX: H, minZ: -H, maxZ: H };
-    collision.setBounds(-WORLD_HALF, WORLD_HALF, -WORLD_HALF, WORLD_HALF);
+    const wb = this.byName.get('WORLD_Bounds')?.userData;     // mapas que não são quadrados (Floresta Sombria)
+    if (wb && Number.isFinite(Number(wb.minX))) {
+      collision.setBounds(Number(wb.minX), Number(wb.maxX), Number(wb.minZ), Number(wb.maxZ));
+      this.bounds = { minX: Number(wb.minX) + 0.5, maxX: Number(wb.maxX) - 0.5, minZ: Number(wb.minZ) + 0.5, maxZ: Number(wb.maxZ) - 0.5 };
+    } else {
+      const H = WORLD_HALF - 1.5;
+      this.bounds = { minX: -H, maxX: H, minZ: -H, maxZ: H };
+      collision.setBounds(-WORLD_HALF, WORLD_HALF, -WORLD_HALF, WORLD_HALF);
+    }
 
     this._setupLighting();
     this.root.traverse((o) => {
       if (!o.isMesh) return;
       const n = o.name || '';
-      if (n.startsWith('COL_') || n === 'Prop_GoldenStrawberry') { o.castShadow = false; o.receiveShadow = false; return; }
+      if (n.startsWith('COL_') || n === 'Prop_GoldenStrawberry' || n === 'Prop_RedStrawberry') { o.castShadow = false; o.receiveShadow = false; return; }
       // o chão e os decalques só recebem sombra (não faz sentido projetar)
-      o.castShadow = !/^(Ground|Paths|Plaza)/.test(n);
+      o.castShadow = !/^(Ground|Paths|Plaza|Fog|Spores|ArenaFloor)/.test(n);
       o.receiveShadow = true;
     });
   }
 
-  get look() { return OUTDOOR_LOOK; }
+  get look() { return this.lookCfg; }
+
+  /** Liga uma caixa de colisão adiada (portão da arena) / desliga uma ativa (espinheiro, barreira). */
+  enableCollider(name) {
+    const b = this.deferredBoxes[name];
+    if (b && !this.collision.hasBox(name)) this.collision.addBox(b, name);
+  }
+
+  disableCollider(name) { return this.collision.removeBox(name); }
 
   _makeLight(node) {
     const ud = node.userData || {};
@@ -131,7 +152,7 @@ export class OutdoorWorld extends Emitter {
   }
 
   _setupLighting() {
-    const L = OUTDOOR_LOOK;
+    const L = this.lookCfg;
     const hemi = new THREE.HemisphereLight(L.hemi.sky, L.hemi.ground, L.hemi.intensity);
     const sun = new THREE.DirectionalLight(L.sun.color, L.sun.intensity);
     sun.castShadow = true;
@@ -178,7 +199,7 @@ export class OutdoorWorld extends Emitter {
     if (focus) {
       const t = this._texel;
       const fx = Math.round(focus.x / t) * t, fz = Math.round(focus.z / t) * t;
-      const o = OUTDOOR_LOOK.sun.offset;
+      const o = this.lookCfg.sun.offset;
       this.sun.position.set(fx + o[0], o[1], fz + o[2]);
       this.sun.target.position.set(fx, 0, fz);
     }

@@ -8,7 +8,7 @@ const MODELS = `${BASE}assets/models/`;
 const DATA = `${BASE}assets/data/`;
 
 /** Prefixos de arquivo que o exportador põe nos nomes dos clips: `<Arquivo>_<Clip>`. */
-const CLIP_PREFIX = /^(ApprenticeSolo|Apprentice|Yumi|Petico|House|ShadowMinion|Divonica|World01)_/;
+const CLIP_PREFIX = /^(ApprenticeSolo|Apprentice|Yumi|Petico|House|ShadowMinion|ShadowDruid|Divonica|World01|World02)_/;
 
 /**
  * O servidor de desenvolvimento do Vite responde index.html (200) para arquivos que não existem,
@@ -134,6 +134,8 @@ export class Assets {
       { key: 'divonica', files: ['Divonica.glb'] },    // v0.2: NPC que entrega a varinha
       { key: 'minion', files: ['ShadowMinion.glb'] },  // v0.2: Sombrito
       { key: 'sprout', files: ['GuardianSprout.glb'] }, // v0.3: Broto Guardião (magia da horta)
+      { key: 'forest', files: ['World02.glb'] },        // v0.4: Floresta Sombria
+      { key: 'druid', files: ['ShadowDruid.glb'] },     // v0.4: o chefe
     ];
     // ?placeholder=1 (ou =house,yumi,petico,apprentice) força os placeholders: útil para testar o fallback.
     const forced = new URLSearchParams(location.search).get('placeholder');
@@ -201,6 +203,9 @@ export class Assets {
       else console.warn(`[Assets] ${name}.glb ausente.`);
     }
     if (m.world.placeholder) console.warn('[Assets] World01.glb ausente: o mundo externo não estará disponível.');
+    if (!m.druid.placeholder) Object.assign(m.druid, this._charData('ShadowDruid'));
+    else console.warn('[Assets] ShadowDruid.glb ausente: sem chefe.');
+    if (m.forest.placeholder) console.warn('[Assets] World02.glb ausente: sem Floresta Sombria.');
 
     // --- Casa
     {

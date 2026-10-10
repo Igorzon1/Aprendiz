@@ -133,6 +133,7 @@ export class Assets {
       { key: 'world', files: ['World01.glb'] },        // v0.2: Vale dos Morangos (ao ar livre)
       { key: 'divonica', files: ['Divonica.glb'] },    // v0.2: NPC que entrega a varinha
       { key: 'minion', files: ['ShadowMinion.glb'] },  // v0.2: Sombrito
+      { key: 'sprout', files: ['GuardianSprout.glb'] }, // v0.3: Broto Guardião (magia da horta)
     ];
     // ?placeholder=1 (ou =house,yumi,petico,apprentice) força os placeholders: útil para testar o fallback.
     const forced = new URLSearchParams(location.search).get('placeholder');

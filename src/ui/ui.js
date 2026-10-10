@@ -194,6 +194,25 @@ function buildShelfSlot(item, index) {
   return { slot, btn };
 }
 
+const FADE_MS = 260;           // saída (fade) dos cartões de objetivo e medidor
+const QUEST_DONE_MS = 1800;    // objetivo concluído: o check fica este tempo antes de sumir
+const UNLOCK_HOLD_MS = 3000;   // faixa de desbloqueio: fica inteira até aqui...
+const UNLOCK_MS = 3500;        // ...e termina ao fim do fade (500 ms, ver CSS)
+const SPARK_COLORS = ['var(--gold)', 'var(--cream)', 'var(--lavender)', '#8FE3B5'];
+
+// Faíscas da rajada do desbloqueio. Ângulo (--r), distância (--d) e atraso variam; o CSS anima.
+function sparksHTML(count) {
+  let out = '';
+  for (let i = 0; i < count; i++) {
+    const r = (i * 360) / count + (i % 2 ? 9 : 0);
+    const d = 150 + ((i * 47) % 5) * 18;
+    const delay = (i % 4) * 40;
+    const c = SPARK_COLORS[i % SPARK_COLORS.length];
+    out += `<i class="ui-unlock-spark" style="--r:${r}deg;--d:${d}px;--delay:${delay}ms;--c:${c}"></i>`;
+  }
+  return out;
+}
+
 export class UI {
   constructor(rootElement) {
     ensureFont();
@@ -578,6 +597,196 @@ export class UI {
       el.classList.add('is-out');
       setTimeout(() => el.remove(), 280);
     }, Math.max(0, ms));
+  }
+
+  // Objetivo (cartão de missão, canto superior esquerdo, abaixo da vida).
+  // setObjective(text, n, total): mostra o texto e o progresso "n/total" com barra fina.
+  // n subindo faz o cartão pulsar. Ao chegar em total, aparece um check verde e o cartão some.
+  // total omitido/null: sem barra nem contagem.
+  setObjective(text, n, total) {
+    const q = this._ensureQuest();
+    const label = String(text ?? '');
+    const hasTotal = total !== undefined && total !== null;
+    const max = hasTotal ? Math.max(0, Number(total) || 0) : 0;
+    const cur = hasTotal ? clamp(Number(n) || 0, 0, max) : Math.max(0, Number(n) || 0);
+    const done = hasTotal && max > 0 && cur >= max;
+    const shown = !q.root.hidden && !q.root.classList.contains('is-out');
+    const sameTask = shown && q.text.textContent === label;
+
+    clearTimeout(q.timer);
+    q.root.hidden = false;
+    q.root.classList.remove('is-out');
+    q.text.textContent = label;
+    q.track.hidden = !hasTotal;
+    q.num.hidden = !hasTotal;
+    if (hasTotal) {
+      q.num.textContent = `${cur}/${max}`;
+      q.fill.style.width = `${max > 0 ? (cur / max) * 100 : 0}%`;
+    }
+    q.root.classList.toggle('is-done', done);
+
+    if (!shown || !sameTask) restartClass(q.card, 'is-pop');
+    else if (q.n !== null && cur > q.n) restartClass(q.card, 'is-bump');
+    q.n = cur;
+
+    if (done && !q.done) {
+      clearTimeout(q.doneTimer);
+      q.doneTimer = setTimeout(() => this.clearObjective(), QUEST_DONE_MS);
+    } else if (!done) {
+      clearTimeout(q.doneTimer);
+    }
+    q.done = done;
+  }
+
+  // Esconde o objetivo com fade.
+  clearObjective() {
+    const q = this._quest;
+    if (!q) return;
+    clearTimeout(q.doneTimer);
+    q.done = false;
+    q.n = null;
+    if (q.root.hidden || q.root.classList.contains('is-out')) return;
+    q.root.classList.add('is-out');
+    clearTimeout(q.timer);
+    q.timer = setTimeout(() => {
+      q.root.hidden = true;
+      q.root.classList.remove('is-out', 'is-done');
+    }, FADE_MS);
+  }
+
+  // Medidor de canalização (cápsula horizontal acima do centro-inferior).
+  // showMeter({ value, zoneStart, zoneEnd, label }): value 0..1; a faixa verde vai de zoneStart a zoneEnd
+  // (0..1); com o valor dentro da faixa, o preenchimento brilha. Chamar de novo só atualiza.
+  // label omitido: mantém o rótulo atual.
+  showMeter({ value = 0, zoneStart, zoneEnd, label } = {}) {
+    const m = this._ensureMeter();
+    // A faixa fica como foi dada; chamadas sem zoneStart/zoneEnd mantêm a última.
+    if (zoneStart != null && zoneEnd != null) {
+      m.zoneA = clamp(Math.min(Number(zoneStart), Number(zoneEnd)) || 0, 0, 1);
+      m.zoneB = clamp(Math.max(Number(zoneStart), Number(zoneEnd)) || 0, 0, 1);
+      m.hasZone = true;
+      m.zone.style.left = `${m.zoneA * 100}%`;
+      m.zone.style.width = `${(m.zoneB - m.zoneA) * 100}%`;
+    }
+    const v = clamp(Number(value) || 0, 0, 1);
+
+    clearTimeout(m.timer);
+    if (!m.on) {
+      m.on = true;
+      m.root.hidden = false;
+      m.root.classList.remove('is-out');
+    }
+    if (label !== undefined) m.label.textContent = label == null ? '' : String(label);
+    m.zone.hidden = !m.hasZone;
+    m.fill.style.width = `${v * 100}%`;
+    m.root.classList.toggle('is-zone', m.hasZone && v >= m.zoneA && v <= m.zoneB);
+  }
+
+  // Esconde o medidor com fade.
+  hideMeter() {
+    const m = this._meter;
+    if (!m || !m.on) return;
+    m.on = false;
+    clearTimeout(m.timer);
+    m.root.classList.add('is-out');
+    m.timer = setTimeout(() => {
+      m.root.hidden = true;
+      m.root.classList.remove('is-out', 'is-zone');
+    }, FADE_MS);
+  }
+
+  // Faixa de desbloqueio no centro da tela: "Nova magia!" pequeno, title grande e subtitle embaixo,
+  // com uma rajada de faíscas em CSS. Fica ~3,5 s e some com fade. A Promise resolve quando sumir.
+  // Se outra faixa aparecer antes, a anterior some na hora e sua Promise resolve.
+  showUnlock(title, subtitle) {
+    if (this._unlock) this._unlock.finish();
+
+    const el = document.createElement('div');
+    el.className = 'ui-unlock';
+    el.innerHTML = `
+      <div class="ui-unlock-card">
+        <p class="ui-unlock-kicker">Nova magia!</p>
+        <h2 class="ui-unlock-title"></h2>
+        <p class="ui-unlock-sub"></p>
+        <div class="ui-unlock-burst" aria-hidden="true">${sparksHTML(14)}</div>
+      </div>`;
+    el.querySelector('.ui-unlock-title').textContent = String(title ?? '');
+    el.querySelector('.ui-unlock-sub').textContent = subtitle ? String(subtitle) : '';
+    this.el.appendChild(el);
+
+    return new Promise((resolve) => {
+      let holdTimer = 0;
+      let endTimer = 0;
+      const finish = () => {
+        clearTimeout(holdTimer);
+        clearTimeout(endTimer);
+        el.remove();
+        if (this._unlock && this._unlock.el === el) this._unlock = null;
+        resolve();
+      };
+      holdTimer = setTimeout(() => el.classList.add('is-out'), UNLOCK_HOLD_MS);
+      endTimer = setTimeout(finish, UNLOCK_MS);
+      this._unlock = { el, finish };
+    });
+  }
+
+  _ensureQuest() {
+    if (this._quest) return this._quest;
+    const root = document.createElement('div');
+    root.className = 'ui-quest';
+    root.hidden = true;
+    root.innerHTML = `
+      <div class="ui-quest-card">
+        <span class="ui-quest-tag">Objetivo</span>
+        <p class="ui-quest-text"></p>
+        <div class="ui-quest-foot">
+          <div class="ui-quest-track"><div class="ui-quest-fill"></div></div>
+          <span class="ui-quest-num"></span>
+          <svg class="ui-quest-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.6l4.4 4.4L19 7.6"/></svg>
+        </div>
+      </div>`;
+    this.el.appendChild(root);
+    const $ = (sel) => root.querySelector(sel);
+    this._quest = {
+      root,
+      card: $('.ui-quest-card'),
+      text: $('.ui-quest-text'),
+      track: $('.ui-quest-track'),
+      fill: $('.ui-quest-fill'),
+      num: $('.ui-quest-num'),
+      timer: 0,
+      doneTimer: 0,
+      n: null,
+      done: false,
+    };
+    return this._quest;
+  }
+
+  _ensureMeter() {
+    if (this._meter) return this._meter;
+    const root = document.createElement('div');
+    root.className = 'ui-meter';
+    root.hidden = true;
+    root.innerHTML = `
+      <p class="ui-meter-label"></p>
+      <div class="ui-meter-track">
+        <div class="ui-meter-zone"></div>
+        <div class="ui-meter-fill"></div>
+      </div>`;
+    this.el.appendChild(root);
+    const $ = (sel) => root.querySelector(sel);
+    this._meter = {
+      root,
+      label: $('.ui-meter-label'),
+      zone: $('.ui-meter-zone'),
+      fill: $('.ui-meter-fill'),
+      timer: 0,
+      on: false,
+      hasZone: false,
+      zoneA: 0,
+      zoneB: 0,
+    };
+    return this._meter;
   }
 
   _buildControls() {

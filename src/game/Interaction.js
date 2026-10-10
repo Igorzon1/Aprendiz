@@ -93,6 +93,7 @@ export class Interaction {
     player.forward(_fwd);
     let best = null, bestD = Infinity;
     for (const it of world.interactables) {
+      if (it.disabled) continue;                     // ex.: o regador enquanto flutua
       const dx = it.pos.x - player.pos.x, dz = it.pos.z - player.pos.z;
       const d = Math.hypot(dx, dz);
       if (d > it.radius) continue;
@@ -146,6 +147,7 @@ export class Interaction {
         case 'pond': await this._talk(item, LINES_POND, { anim: false }); break;
         case 'bench': await this._bench(item); break;
         case 'gate': await this._gate(item); break;
+        case 'gardenbook': case 'wateringcan': await this.game.garden?.interact(item); break;   // v0.3: Horta Mágica
         case 'npc': await this._npcTalk(item); break;
         case 'window': await this._talk(item, LINES.window, { anim: false }); break;
         case 'bed': await this._talk(item, LINES.bed, { anim: true }); break;

@@ -5,6 +5,8 @@ import { CameraRig } from './CameraRig.js';
 import { Collision } from './Collision.js';
 import { Combat } from './Combat.js';
 import { Enemies } from './Enemies.js';
+import { GardenMinigame } from './GardenMinigame.js';
+import { GuardianSprout } from './GuardianSprout.js';
 import { Npc } from './Npc.js';
 import { OutdoorWorld } from './OutdoorWorld.js';
 import { PlayerVitals } from './PlayerVitals.js';
@@ -68,6 +70,7 @@ export class Game {
 
     this.input = new Input(window);
     this.state = createGameState();
+    if (new URLSearchParams(location.search).get('garden') === '1') this.state.flags.hasWand = true;   // dev: ?garden=1
     this.speakAt = null;
     this._sayToken = 0;
     this._bubbleShown = false;
@@ -177,6 +180,10 @@ export class Game {
 
     if (this.outdoorWorld) {
       this.strawberries.setup(this.outdoorWorld);
+      // v0.3: mini game da horta (regar + crescer) que ensina o Broto Guardião
+      this.garden = new GardenMinigame(this);
+      this.garden.setup(this.outdoorWorld);
+      this.addSystem(this.garden);
       // Divonica fica em NPC_Divonica; interativo dinâmico "Conversar" (acompanha a posição dela)
       const npc = this.npcs.Divonica;
       if (npc) {
@@ -184,10 +191,13 @@ export class Game {
         npc.place(this.outdoorWorld.npcSpot?.pos.x ?? 8.9, this.outdoorWorld.npcSpot?.pos.z ?? -15.5, this.outdoorWorld.npcSpot?.yaw ?? 0);
       }
     }
+    this.sprout = new GuardianSprout(this);    // v0.3: tecla Q, depois do mini game
+    this.addSystem(this.sprout);
     this.cameraRig.resolveActor = (spec) => this._cameraActor(spec);
     this._setHouseOccluders();
     this.cameraRig.snapTo(this.player.pos);
-    if (new URLSearchParams(location.search).get('scene') === 'outdoor' && this.outdoorWorld) {
+    const qs = new URLSearchParams(location.search);
+    if ((qs.get('scene') === 'outdoor' || qs.get('garden') === '1') && this.outdoorWorld) {
       this.story.flags.peticoBack = true;
       this.scenes.apply('outdoor');
     }
@@ -247,7 +257,7 @@ export class Game {
     this.input.clear();
     this.input.enabled = true;
     const q = new URLSearchParams(location.search);
-    if (q.get('skip') === '1' || q.get('scene') === 'outdoor') this._devSkip(q);
+    if (q.get('skip') === '1' || q.get('scene') === 'outdoor' || q.get('garden') === '1') this._devSkip(q);
     else this.story.play('opening');
     if (this.scenes.current === 'outdoor') this._onSceneEntered('outdoor', !this.story.flags['done:divonicaMeet']);
   }
@@ -268,6 +278,22 @@ export class Game {
     petico.activate(true);
     petico.brain.mode = 'free';
     if (q.get('wand') === '1') this.state.flags.hasWand = true;
+    if (q.get('garden') === '1') this._devGarden(q);
+  }
+
+  /** ?garden=1: começa ao ar livre, com a varinha, diante do portão da horta (?gphase=water|grow pula parte do mini game). */
+  _devGarden(q) {
+    this.state.flags.hasWand = true;
+    applyWandVisibility(this.state, this.wands);
+    this.story.flags['done:divonicaMeet'] = true;
+    const x = 12.8, z = 15.2;
+    this.player.teleport(x, z, 0);
+    let i = 0;
+    for (const cat of this._activeCats()) { cat.teleport(x + (i++ % 2 ? 0.8 : -0.8), z - 0.9, 0); }
+    this.cameraRig.snapTo(this.player.pos);
+    const ph = q.get('gphase');
+    if (ph) this.garden?.skipTo(ph);
+    if (ph === 'done') this.state.flags.sproutSpell = true;
   }
 
   /** Terminou de entrar num cenário (depois do fade). */
